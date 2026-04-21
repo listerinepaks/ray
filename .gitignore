@@ -35,13 +35,6 @@ staticfiles/
 # Cursor (local)
 .cursor/
 
-# Visual design repo — variable fonts + wordmark are enough for builds; skip bundles
-visual/Inter.zip
-visual/Playfair_Display.zip
-visual/Inter/static/
-visual/Playfair_Display/static/
-visual/ray
-
 # Vue / frontend
 node_modules/
 coverage/
