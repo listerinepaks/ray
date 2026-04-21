@@ -1,0 +1,17 @@
+[project]
+name = "ray"
+version = "0.1.0"
+description = "Ray API"
+requires-python = ">=3.12"
+dependencies = [
+    "django>=5.1,<6.0",
+    "djangorestframework>=3.15,<4.0",
+    "pillow>=10.0",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["config", "moments", "moments.migrations"]

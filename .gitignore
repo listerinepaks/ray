@@ -1,0 +1,51 @@
+.DS_Store
+.env
+.env.*
+.python-version
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+.venv/
+venv/
+
+# Packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Django
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+
+# Tooling
+.coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Vue / frontend
+node_modules/
+coverage/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.pnpm-store/
+.yarn/
+.vite/
+dist/
+
+# Expo / React Native
+.expo/
+.expo-shared/
+android/
+ios/
