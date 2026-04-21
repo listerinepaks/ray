@@ -151,3 +151,12 @@ Build a dev client or use Expo Go with that env (see `ray-mobile` / `app.json`).
 - **Run dir**: `sudo mkdir -p /opt/ray/run && sudo chown deploy:www-data /opt/ray/run && sudo chmod 2775 /opt/ray/run` so Gunicorn (as `deploy`) can create the socket and nginx (`www-data`) can connect.
 - **Stale socket**: If Gunicorn died, remove `django.sock` and restart: `sudo supervisorctl restart ray:gunicorn`.
 - **Logs**: `tail /var/log/ray/gunicorn.err.log` and `sudo tail /var/log/nginx/error.log`.
+
+**`No such file or directory` on `django.sock`** — the socket is only created when Gunicorn starts and binds. Nginx is not the fix; Ray’s Gunicorn process is failing or not running.
+
+1. Use **`config.wsgi:application`** and **`directory=/opt/ray`** (not `ray.wsgi`, not a non-existent `/opt/ray/app`).
+2. Match the real venv in Supervisor: `/opt/ray/.venv/bin/gunicorn` or `/opt/ray/venv/bin/gunicorn`.
+3. Read **`/var/log/ray/gunicorn.err.log`** for Django import errors or missing `DJANGO_SECRET_KEY`.
+4. Manual test as `deploy` (stop `ray:gunicorn` first):  
+   `sudo -u deploy bash -lc 'cd /opt/ray && set -a && . /opt/ray/.env && set +a && exec /opt/ray/.venv/bin/gunicorn config.wsgi:application --bind unix:/opt/ray/run/django.sock --umask 007'`  
+   Then `ls -l /opt/ray/run/django.sock`. If logs mention another app (Neo4j, etc.), Ray’s Supervisor stanza is wrong or logging to the wrong file.
