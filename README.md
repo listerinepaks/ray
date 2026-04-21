@@ -144,3 +144,10 @@ EXPO_PUBLIC_API_URL=https://ray.wright5.us
 ```
 
 Build a dev client or use Expo Go with that env (see `ray-mobile` / `app.json`). Session vs token: the mobile app uses the **token** auth path against the same API base.
+
+### Unix socket / 502 from nginx
+
+- **Config**: Nginx must proxy via an `upstream` block pointing at `unix:/opt/ray/run/django.sock` (see `nginx/nginx-production.conf`). A bare `proxy_pass http://unix:/path.sock` without the correct form often fails.
+- **Run dir**: `sudo mkdir -p /opt/ray/run && sudo chown deploy:www-data /opt/ray/run && sudo chmod 2775 /opt/ray/run` so Gunicorn (as `deploy`) can create the socket and nginx (`www-data`) can connect.
+- **Stale socket**: If Gunicorn died, remove `django.sock` and restart: `sudo supervisorctl restart ray:gunicorn`.
+- **Logs**: `tail /var/log/ray/gunicorn.err.log` and `sudo tail /var/log/nginx/error.log`.
