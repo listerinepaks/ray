@@ -1,0 +1,261 @@
+Here’s a clean, usable write-up you can treat as your initial design system for Ray.
+
+⸻
+
+Ray — Visual Identity (v1)
+
+Core tone
+
+Ray is a family journal centered on shared moments of light.
+The interface should feel:
+
+* warm
+* calm
+* spacious
+* reflective
+* quietly human
+
+Avoid anything that feels:
+
+* overly playful
+* overly technical
+* visually loud
+
+⸻
+
+Color system
+
+Background
+
+* Primary background
+    #FAF7F2
+    Warm off-white. This should be the dominant canvas.
+* Secondary background
+    Slightly darker cream for cards or sections
+    #F3EFE7
+
+⸻
+
+Primary accent
+
+* Golden
+    #F4C95D
+
+Use for:
+
+* buttons (primary actions)
+* highlights
+* subtle UI emphasis
+
+Avoid using it in large solid blocks.
+
+⸻
+
+Secondary accents
+
+These add depth and prevent everything from feeling flat.
+
+* Peach
+    #F2A97B
+    Use sparingly for warmth and variation
+* Dusk blue
+    #A7B7C9
+    Use for secondary actions, tags, or subtle UI contrast
+
+⸻
+
+Text colors
+
+* Primary text
+    #2F2F2F (soft charcoal, not pure black)
+* Secondary text
+    #6B6B6B
+* Muted text
+    #9A9A9A
+
+⸻
+
+Typography
+
+Font pairing
+
+* Primary font: Inter
+* Accent font: Playfair Display
+
+⸻
+
+Usage
+
+Inter (default everywhere)
+
+Use for:
+
+* body text
+* UI labels
+* buttons
+* navigation
+* metadata
+
+Recommended weights:
+
+* Regular (400)
+* Medium (500)
+* Semi-bold (600)
+
+⸻
+
+Playfair Display (limited, intentional)
+
+Use for:
+
+* entry titles
+* featured quotes
+* occasional headings
+
+Avoid:
+
+* small sizes
+* long paragraphs
+* UI elements
+
+This font should feel like a journal voice, not the system voice.
+
+⸻
+
+Example hierarchy
+
+* Entry title → Playfair Display
+* Body text → Inter
+* Metadata (date, people) → Inter medium
+* Buttons → Inter semi-bold
+
+⸻
+
+Layout and spacing
+
+* generous padding
+* clear separation between sections
+* avoid dense layouts
+
+Guidelines
+
+* Card padding: 16–24px
+* Section spacing: 24–40px
+* Border radius: 12–16px
+
+⸻
+
+Components
+
+Cards (entries)
+
+* soft background (cream or white)
+* subtle shadow or none
+* rounded corners
+* image-first layout
+
+⸻
+
+Buttons
+
+* primary: golden background
+* secondary: neutral or dusk blue
+
+No harsh outlines or sharp edges.
+
+⸻
+
+Inputs
+
+* simple
+* lightly bordered or filled
+* no heavy styling
+
+⸻
+
+Imagery
+
+Photos are the center of the experience.
+
+* large
+* minimal cropping
+* soft rounded corners
+* no heavy overlays
+
+Optional:
+
+* very subtle warm tone or grain (light use only)
+
+⸻
+
+Iconography
+
+* simple line icons
+* slightly rounded strokes
+* consistent weight
+
+Avoid:
+
+* sharp geometric icons
+* overly playful illustrations
+
+⸻
+
+Hand-drawn elements
+
+Allowed, but restrained.
+
+Use for:
+
+* small accents
+* dividers
+* subtle decorative touches
+
+Do not:
+
+* build the entire UI in a hand-drawn style
+
+Goal:
+
+a hint of humanity, not a sketchbook
+
+⸻
+
+Interaction feel
+
+* fast but calm
+* no aggressive animations
+* subtle fades or transitions
+
+⸻
+
+Overall direction
+
+Ray should feel like:
+
+a quiet, shared journal where moments are held in light
+
+Not:
+
+* a social media feed
+* a productivity tool
+* a playful kids app
+
+⸻
+
+Implementation note (for you)
+
+This system translates cleanly into:
+
+* Tailwind config (colors + spacing)
+* React component library
+* consistent mobile UI via React Native
+
+⸻
+
+If you want next step, I would:
+
+* design one screen (timeline or entry view)
+* then lock patterns from that
+
+That’s where this stops being abstract and starts guiding real decisions.

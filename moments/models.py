@@ -59,6 +59,11 @@ class Moment(models.Model):
     date = models.DateField()
     observed_at = models.DateTimeField(null=True, blank=True)
     title = models.CharField(max_length=140, blank=True)
+    bible_verse = models.CharField(
+        max_length=300,
+        blank=True,
+        help_text="Optional Bible verse line (e.g. reference and text).",
+    )
     reflection = models.TextField(blank=True)
     location_name = models.CharField(max_length=200, blank=True)
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)

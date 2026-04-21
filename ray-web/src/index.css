@@ -1,0 +1,94 @@
+/* Ray visual identity v1 — see /visual/identity */
+
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('../../visual/Inter/Inter-VariableFont_opsz,wght.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: Inter;
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('../../visual/Inter/Inter-Italic-VariableFont_opsz,wght.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('../../visual/Playfair_Display/PlayfairDisplay-VariableFont_wght.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: italic;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('../../visual/Playfair_Display/PlayfairDisplay-Italic-VariableFont_wght.ttf')
+    format('truetype');
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:root {
+  /* Color system — visual/identity */
+  --bg-primary: #faf7f2;
+  --bg-secondary: #f3efe7;
+  --accent-golden: #f4c95d;
+  --accent-peach: #f2a97b;
+  --accent-dusk: #a7b7c9;
+  --text-primary: #2f2f2f;
+  --text-secondary: #6b6b6b;
+  --text-muted: #9a9a9a;
+
+  --card-bg: #ffffff;
+  --card-border: rgba(47, 47, 47, 0.08);
+  --banner-bg: #f3efe7;
+  --banner-border: rgba(47, 47, 47, 0.1);
+  --pill-bg: rgba(167, 183, 201, 0.35);
+  --pill-fg: #2f2f2f;
+
+  font-family: Inter, system-ui, sans-serif;
+  line-height: 1.55;
+  font-weight: 400;
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+code {
+  font-size: 0.9em;
+  font-family: ui-monospace, monospace;
+}
+
+a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-decoration-color: rgba(107, 107, 107, 0.45);
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--text-primary);
+  text-decoration-color: var(--accent-peach);
+}

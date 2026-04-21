@@ -1,7 +1,8 @@
 from django.db import transaction
 from rest_framework import serializers
 
-from .models import Moment, MomentAccess, MomentPerson, MomentPhoto, Person
+from .access import get_moment_access_level
+from .models import Comment, Moment, MomentAccess, MomentPerson, MomentPhoto, Person, Reaction
 
 
 class PersonSerializer(serializers.ModelSerializer):
@@ -46,6 +47,7 @@ class MomentSerializer(serializers.ModelSerializer):
     photos = MomentPhotoSerializer(many=True, read_only=True)
     tagged_people = serializers.SerializerMethodField()
     access_list = serializers.SerializerMethodField()
+    my_access = serializers.SerializerMethodField()
 
     people = MomentPersonWriteSerializer(many=True, write_only=True, required=False)
     access = MomentAccessWriteSerializer(many=True, write_only=True, required=False)
@@ -59,20 +61,25 @@ class MomentSerializer(serializers.ModelSerializer):
             "date",
             "observed_at",
             "title",
+            "bible_verse",
             "reflection",
             "location_name",
             "latitude",
             "longitude",
             "visibility_mode",
             "photos",
-            "tagged_people",
             "access_list",
+            "my_access",
+            "tagged_people",
             "people",
             "access",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "author", "created_at", "updated_at"]
+
+    def get_my_access(self, obj):
+        return get_moment_access_level(self.context["request"].user, obj)
 
     def get_tagged_people(self, obj):
         links = obj.people.select_related("person", "person__linked_user")
@@ -216,3 +223,17 @@ class MomentSerializer(serializers.ModelSerializer):
             MomentAccess.objects.bulk_create(to_create)
         if to_update:
             MomentAccess.objects.bulk_update(to_update, ["access_level"])
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ["id", "moment", "author", "text", "created_at", "updated_at"]
+        read_only_fields = ["id", "moment", "author", "created_at", "updated_at"]
+
+
+class ReactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Reaction
+        fields = ["id", "moment", "user", "type", "created_at"]
+        read_only_fields = ["id", "moment", "user", "created_at"]
