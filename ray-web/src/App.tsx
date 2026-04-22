@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import {
+  fetchProfile,
   fetchMe,
   fetchMoments,
+  mediaUrl,
   postLogin,
   postLogout,
   type Me,
   type Moment,
+  type Profile as ProfileType,
 } from './api'
 import { RayLogo } from './components/RayLogo'
 import { CreateMoment } from './pages/CreateMoment'
@@ -20,6 +23,7 @@ function App() {
   const navigate = useNavigate()
   const location = useLocation()
   const [user, setUser] = useState<Me | null | undefined>(undefined)
+  const [profile, setProfile] = useState<ProfileType | null>(null)
   const [moments, setMoments] = useState<Moment[]>([])
   const [loadingMoments, setLoadingMoments] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -27,6 +31,8 @@ function App() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loginBusy, setLoginBusy] = useState(false)
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
+  const accountMenuRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -65,6 +71,43 @@ function App() {
     }
   }, [user, location.pathname])
 
+  useEffect(() => {
+    if (!user) {
+      setProfile(null)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const next = await fetchProfile()
+        if (!cancelled) setProfile(next)
+      } catch {
+        if (!cancelled) setProfile(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (!accountMenuOpen) return
+    function onPointerDown(e: MouseEvent) {
+      if (!accountMenuRef.current?.contains(e.target as Node)) {
+        setAccountMenuOpen(false)
+      }
+    }
+    function onEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') setAccountMenuOpen(false)
+    }
+    window.addEventListener('mousedown', onPointerDown)
+    window.addEventListener('keydown', onEscape)
+    return () => {
+      window.removeEventListener('mousedown', onPointerDown)
+      window.removeEventListener('keydown', onEscape)
+    }
+  }, [accountMenuOpen])
+
   async function onLogin(e: FormEvent) {
     e.preventDefault()
     setLoginError(null)
@@ -91,9 +134,15 @@ function App() {
       setError(err instanceof Error ? err.message : 'Logout failed.')
     }
     setUser(null)
+    setProfile(null)
     setMoments([])
+    setAccountMenuOpen(false)
     navigate('/', { replace: true })
   }
+
+  const accountLabel = profile?.display_name || user?.username || ''
+  const accountAvatar = mediaUrl(profile?.avatar)
+  const accountInitial = accountLabel.slice(0, 1).toUpperCase() || '?'
 
   if (user === undefined) {
     return (
@@ -155,22 +204,53 @@ function App() {
             <Link to="/" className="brand-logo-link" aria-label="Ray home">
               <RayLogo />
             </Link>
-            <div className="brand-text">
-              <p className="subtitle">
-                Signed in as <strong>{user.username}</strong>
-              </p>
-            </div>
           </div>
           <div className="header-actions">
-            <Link to="/profile" className="btn-secondary">
-              Profile
-            </Link>
             <Link to="/moments/new" className="header-new">
               New moment
             </Link>
-            <button type="button" className="btn-secondary" onClick={() => void onLogout()}>
-              Sign out
-            </button>
+            <div className="account-menu" ref={accountMenuRef}>
+              <button
+                type="button"
+                className="account-menu-trigger"
+                aria-haspopup="menu"
+                aria-expanded={accountMenuOpen}
+                aria-label="Open account menu"
+                onClick={() => setAccountMenuOpen((open) => !open)}
+              >
+                {accountAvatar ? (
+                  <img src={accountAvatar} alt="" className="account-avatar-image" />
+                ) : (
+                  <span className="account-avatar-fallback" aria-hidden>
+                    {accountInitial}
+                  </span>
+                )}
+              </button>
+              {accountMenuOpen ? (
+                <div className="account-menu-popover" role="menu">
+                  <div className="account-menu-summary">
+                    <div className="account-menu-name">{accountLabel}</div>
+                    <div className="account-menu-username">@{user.username}</div>
+                  </div>
+                  <Link
+                    to="/profile"
+                    className="account-menu-item"
+                    role="menuitem"
+                    onClick={() => setAccountMenuOpen(false)}
+                  >
+                    Profile
+                  </Link>
+                  <button
+                    type="button"
+                    className="account-menu-item account-menu-item--button"
+                    role="menuitem"
+                    onClick={() => void onLogout()}
+                  >
+                    Sign out
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       </header>

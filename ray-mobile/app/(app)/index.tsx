@@ -3,6 +3,7 @@ import { useRouter, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -22,7 +23,7 @@ import {
   LIST_REFLECTION_MAX_WORDS,
   truncateWords,
 } from '@/lib/truncateWords';
-import { fetchMoments, mediaUrl, type Moment } from '@/lib/api';
+import { fetchMoments, fetchProfile, mediaUrl, type Moment, type Profile } from '@/lib/api';
 
 function formatKindLabel(kind: string): string {
   return kind === 'sunrise' ? 'Sunrise' : kind === 'sunset' ? 'Sunset' : kind;
@@ -34,6 +35,7 @@ export default function TimelineScreen() {
   const navigation = useNavigation();
   const { user } = useAuth();
   const [moments, setMoments] = useState<Moment[]>([]);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,14 +57,43 @@ export default function TimelineScreen() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!user) {
+      setProfile(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const next = await fetchProfile();
+        if (!cancelled) setProfile(next);
+      } catch {
+        if (!cancelled) setProfile(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   useLayoutEffect(() => {
+    const avatarUri = mediaUrl(profile?.avatar);
+    const avatarLabel = profile?.display_name || user?.username || '?';
     navigation.setOptions({
       headerLeft: () => (
         <Pressable
           onPress={() => router.push('/profile')}
           hitSlop={12}
-          style={{ paddingHorizontal: 4, paddingVertical: 8 }}>
-          <Text style={styles.headerSide}>Profile</Text>
+          style={styles.headerAvatarButton}>
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={styles.headerAvatarImage} />
+          ) : (
+            <View style={styles.headerAvatarFallback}>
+              <Text style={styles.headerAvatarLetter}>
+                {avatarLabel.slice(0, 1).toUpperCase()}
+              </Text>
+            </View>
+          )}
         </Pressable>
       ),
       headerRight: () => (
@@ -74,7 +105,7 @@ export default function TimelineScreen() {
         </Pressable>
       ),
     });
-  }, [navigation, router]);
+  }, [navigation, profile?.avatar, profile?.display_name, router, user?.username]);
 
   return (
     <ScrollView
@@ -206,10 +237,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
   },
-  headerSide: {
+  headerAvatarButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    overflow: 'hidden',
+    marginLeft: 4,
+    backgroundColor: theme.bgSecondary,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+  },
+  headerAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  headerAvatarFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerAvatarLetter: {
     fontFamily: fonts.sansSemiBold,
     fontSize: 15,
-    color: theme.textSecondary,
+    color: theme.textPrimary,
   },
   headerNew: {
     fontFamily: fonts.sansSemiBold,
