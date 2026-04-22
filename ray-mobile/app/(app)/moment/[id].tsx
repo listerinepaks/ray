@@ -20,7 +20,6 @@ function formatObserved(iso: string | null): string | null {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return null;
     return new Intl.DateTimeFormat(undefined, {
-      dateStyle: 'medium',
       timeStyle: 'short',
     }).format(d);
   } catch {
@@ -98,6 +97,7 @@ export default function MomentEntryScreen() {
   const sortedPhotos = [...moment.photos].sort((a, b) => a.sort_order - b.sort_order);
   const hero = sortedPhotos[0];
   const rest = sortedPhotos.slice(1);
+  const observedTime = formatObserved(moment.observed_at);
   const displayTitle =
     moment.title.trim() ||
     `${formatKindLabel(moment.kind)} · ${formatSmartDate(moment.date)}`;
@@ -147,10 +147,10 @@ export default function MomentEntryScreen() {
             <Text style={styles.metaKind}>{formatKindLabel(moment.kind)}</Text>
             <Text style={styles.metaSep}> · </Text>
             <Text>{formatSmartDate(moment.date)}</Text>
-            {formatObserved(moment.observed_at) ? (
+            {observedTime ? (
               <>
                 <Text style={styles.metaSep}> · </Text>
-                <Text>{formatObserved(moment.observed_at)}</Text>
+                <Text>{observedTime}</Text>
               </>
             ) : null}
           </Text>
