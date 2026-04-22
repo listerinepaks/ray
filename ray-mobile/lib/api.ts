@@ -295,6 +295,15 @@ export async function updateMoment(id: number, payload: CreateMomentPayload): Pr
   return res.json() as Promise<Moment>;
 }
 
+export async function deleteMoment(id: number): Promise<void> {
+  const base = getApiBase();
+  const res = await fetch(`${base}/api/moments/${id}/`, {
+    method: 'DELETE',
+    headers: baseHeaders(),
+  });
+  if (!res.ok) throw new Error(await parseErrorBody(res));
+}
+
 export async function deleteMomentPhoto(momentId: number, photoId: number): Promise<void> {
   const base = getApiBase();
   const res = await fetch(`${base}/api/moments/${momentId}/photos/${photoId}/`, {

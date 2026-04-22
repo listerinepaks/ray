@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -22,6 +24,7 @@ import { fonts, theme } from '@/constants/theme';
 import {
   createMoment,
   createPerson,
+  deleteMoment,
   deleteMomentPhoto,
   fetchMoment,
   fetchPeople,
@@ -81,8 +84,68 @@ function toDatetimeLocal(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function formatDateInputFromDate(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function parseDateInput(value: string): Date | null {
+  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0, 0);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 function newKey() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function parseExifDateTime(value: unknown): Date | null {
+  if (typeof value !== 'string') return null;
+  // Typical EXIF: "YYYY:MM:DD HH:MM:SS"
+  const m = value.match(
+    /^(\d{4})[:\-](\d{2})[:\-](\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/,
+  );
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const h = Number(m[4]);
+  const mi = Number(m[5]);
+  const s = Number(m[6] ?? '0');
+  const parsed = new Date(y, mo - 1, d, h, mi, s);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function getCapturedAtFromAsset(asset: ImagePicker.ImagePickerAsset): Date | null {
+  const exif = asset.exif as Record<string, unknown> | null | undefined;
+  const exifCandidates = [
+    exif?.DateTimeOriginal,
+    exif?.DateTimeDigitized,
+    exif?.DateTime,
+  ];
+  for (const candidate of exifCandidates) {
+    const d = parseExifDateTime(candidate);
+    if (d) return d;
+  }
+  if (typeof asset.fileName === 'string') {
+    // Handles iOS style IMG_20260422_071512.jpg style names when present.
+    const fileNameMatch = asset.fileName.match(
+      /(\d{4})(\d{2})(\d{2})[_-]?(\d{2})(\d{2})(\d{2})/,
+    );
+    if (fileNameMatch) {
+      const d = new Date(
+        Number(fileNameMatch[1]),
+        Number(fileNameMatch[2]) - 1,
+        Number(fileNameMatch[3]),
+        Number(fileNameMatch[4]),
+        Number(fileNameMatch[5]),
+        Number(fileNameMatch[6]),
+      );
+      if (!Number.isNaN(d.getTime())) return d;
+    }
+  }
+  return null;
 }
 
 type Props = {
@@ -105,6 +168,8 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
   const [kind, setKind] = useState<'sunrise' | 'sunset' | 'other'>('sunrise');
   const [date, setDate] = useState(todayDateString);
   const [observedAt, setObservedAt] = useState('');
+  const [dateEdited, setDateEdited] = useState(false);
+  const [observedAtEdited, setObservedAtEdited] = useState(false);
   const [title, setTitle] = useState('');
   const [bibleVerse, setBibleVerse] = useState('');
   const [reflection, setReflection] = useState('');
@@ -118,6 +183,7 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [uploadPhase, setUploadPhase] = useState<string | null>(null);
   const [loadingMoment, setLoadingMoment] = useState(false);
   const [momentLoadError, setMomentLoadError] = useState<string | null>(null);
@@ -129,6 +195,9 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
   const [personError, setPersonError] = useState<string | null>(null);
 
   const [pickerForRowKey, setPickerForRowKey] = useState<string | null>(null);
+  const [whenEditorOpen, setWhenEditorOpen] = useState(false);
+  const [whenDraft, setWhenDraft] = useState<Date>(new Date());
+  const [whenDraftHasTime, setWhenDraftHasTime] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,6 +237,8 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
         setKind(m.kind === 'sunset' ? 'sunset' : m.kind === 'other' ? 'other' : 'sunrise');
         setDate(m.date);
         setObservedAt(m.observed_at ? toDatetimeLocal(m.observed_at) : '');
+        setDateEdited(true);
+        setObservedAtEdited(true);
         setTitle(m.title);
         setBibleVerse(m.bible_verse ?? '');
         setReflection(m.reflection);
@@ -211,6 +282,7 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
+      exif: true,
       quality: 0.88,
     });
     if (result.canceled) return;
@@ -222,7 +294,14 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
       next.push({ key: newKey(), uri, caption: '', name, type });
     }
     setPhotos((prev) => [...prev, ...next]);
-  }, []);
+
+    // Preload from first photo metadata if user hasn't already set these.
+    const firstWithMetadata = result.assets.map(getCapturedAtFromAsset).find(Boolean) ?? null;
+    if (firstWithMetadata) {
+      if (!dateEdited) setDate(formatDateInputFromDate(firstWithMetadata));
+      if (!observedAtEdited) setObservedAt(toDatetimeLocal(firstWithMetadata.toISOString()));
+    }
+  }, [dateEdited, observedAtEdited]);
 
   const removePhoto = useCallback((key: string) => {
     setPhotos((prev) => prev.filter((p) => p.key !== key));
@@ -414,6 +493,35 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
     }
   }
 
+  function onDeleteMoment() {
+    if (!isEdit || editId == null || deleting) return;
+    Alert.alert(
+      'Delete moment?',
+      'This will permanently remove this moment and its photos.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                setSubmitError(null);
+                setDeleting(true);
+                await deleteMoment(editId);
+                router.replace('/');
+              } catch (err) {
+                setSubmitError(err instanceof Error ? err.message : 'Could not delete moment.');
+              } finally {
+                setDeleting(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }
+
   const stepIndex = CREATE_STEPS.indexOf(createStep);
   const isWizard = !isEdit;
 
@@ -449,6 +557,61 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
     onExitFlow();
   }
 
+  function openWhenEditor() {
+    const observedDate = observedAt ? new Date(observedAt) : null;
+    const base =
+      observedDate && !Number.isNaN(observedDate.getTime())
+        ? observedDate
+        : (parseDateInput(date) ?? new Date());
+    setWhenDraft(base);
+    setWhenDraftHasTime(Boolean(observedAt));
+    setWhenEditorOpen(true);
+  }
+
+  function onWhenDateChange(_: DateTimePickerEvent, next?: Date) {
+    if (next) {
+      const d = new Date(whenDraft);
+      d.setFullYear(next.getFullYear(), next.getMonth(), next.getDate());
+      setWhenDraft(d);
+    }
+  }
+
+  function onWhenTimeChange(_: DateTimePickerEvent, next?: Date) {
+    if (next) {
+      const d = new Date(whenDraft);
+      d.setHours(next.getHours(), next.getMinutes(), 0, 0);
+      setWhenDraft(d);
+    }
+  }
+
+  function saveWhenEditor() {
+    setDateEdited(true);
+    setObservedAtEdited(true);
+    setDate(formatDateInputFromDate(whenDraft));
+    if (whenDraftHasTime) {
+      setObservedAt(toDatetimeLocal(whenDraft.toISOString()));
+    } else {
+      setObservedAt('');
+    }
+    setWhenEditorOpen(false);
+  }
+
+  const humanDate = useMemo(() => {
+    const base = parseDateInput(date);
+    if (!base) return date || 'No date set';
+    return new Intl.DateTimeFormat(undefined, { dateStyle: 'full' }).format(base);
+  }, [date]);
+
+  const humanObservedAt = useMemo(() => {
+    if (!observedAt) return null;
+    const d = new Date(observedAt);
+    if (Number.isNaN(d.getTime())) return null;
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'full',
+      timeStyle: 'short',
+    }).format(d);
+  }, [observedAt]);
+
   if (!currentUser) return null;
 
   return (
@@ -469,6 +632,10 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
           </View>
         ) : (
           <>
+            <Pressable onPress={onBackAction} style={styles.topBackBtn} hitSlop={8}>
+              <Ionicons name="chevron-back" size={20} color={theme.textSecondary} />
+            </Pressable>
+
             {submitError ? (
               <View style={styles.banner} accessibilityRole="alert">
                 <Text style={styles.bannerText}>{submitError}</Text>
@@ -529,29 +696,12 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
               </Pressable>
             </View>
 
-            <View style={styles.row}>
-              <View style={styles.fieldGrow}>
-                <Text style={styles.label}>Date (YYYY-MM-DD)</Text>
-                <TextInput
-                  value={date}
-                  onChangeText={setDate}
-                  placeholder="2026-04-21"
-                  placeholderTextColor={theme.textMuted}
-                  style={styles.input}
-                  autoCapitalize="none"
-                />
-              </View>
-            </View>
-            <View style={styles.field}>
-              <Text style={styles.label}>Exact time (optional)</Text>
-              <TextInput
-                value={observedAt}
-                onChangeText={setObservedAt}
-                placeholder="YYYY-MM-DDTHH:MM (local)"
-                placeholderTextColor={theme.textMuted}
-                style={styles.input}
-                autoCapitalize="none"
-              />
+            <View style={styles.whenCard}>
+              <Text style={styles.whenLabel}>When</Text>
+              <Text style={styles.whenValue}>{humanObservedAt ?? humanDate}</Text>
+              <Pressable onPress={openWhenEditor} style={styles.whenEditBtn}>
+                <Text style={styles.whenEditBtnText}>Edit</Text>
+              </Pressable>
             </View>
               </>
             ) : null}
@@ -792,11 +942,6 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
 
             {isWizard ? (
               <View style={styles.stepActions}>
-                <View style={styles.stepLeftActions}>
-                  <Pressable onPress={onBackAction} style={styles.stepCancelBtn}>
-                    <Text style={styles.stepCancelBtnText}>Back</Text>
-                  </Pressable>
-                </View>
                 {createStep !== 'visibility' ? (
                   <Pressable onPress={goToNextStep} style={styles.stepNextBtn}>
                     <Text style={styles.stepNextBtnText}>Next</Text>
@@ -821,17 +966,26 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
               </View>
             ) : (
               <View style={styles.singleActions}>
-                <Pressable onPress={onBackAction} style={styles.stepCancelBtn}>
-                  <Text style={styles.stepCancelBtnText}>Back</Text>
-                </Pressable>
+                {isEdit ? (
+                  <Pressable
+                    onPress={onDeleteMoment}
+                    disabled={submitting || deleting}
+                    style={({ pressed }) => [
+                      styles.deleteBtn,
+                      (submitting || deleting) && styles.submitDisabled,
+                      pressed && !(submitting || deleting) && { opacity: 0.92 },
+                    ]}>
+                    <Text style={styles.deleteBtnText}>{deleting ? 'Deleting…' : 'Delete moment'}</Text>
+                  </Pressable>
+                ) : null}
                 <Pressable
                   onPress={() => void onSubmit()}
-                  disabled={submitting}
+                  disabled={submitting || deleting}
                   style={({ pressed }) => [
                     styles.submit,
                     styles.singleSubmit,
-                    submitting && styles.submitDisabled,
-                    pressed && !submitting && { opacity: 0.94 },
+                    (submitting || deleting) && styles.submitDisabled,
+                    pressed && !(submitting || deleting) && { opacity: 0.94 },
                   ]}>
                   {submitting ? (
                     <ActivityIndicator color={theme.textPrimary} />
@@ -909,6 +1063,53 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
           </View>
         </Pressable>
       </Modal>
+
+      <Modal visible={whenEditorOpen} animationType="slide" transparent>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Edit date & time</Text>
+            <Text style={styles.muted}>Adjust when this moment happened.</Text>
+            <View style={styles.whenPickerBlock}>
+              <Text style={styles.label}>Date</Text>
+              <DateTimePicker
+                value={whenDraft}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={onWhenDateChange}
+              />
+            </View>
+            <View style={styles.whenToggleRow}>
+              <Text style={styles.label}>Include exact time</Text>
+              <Pressable
+                onPress={() => setWhenDraftHasTime((v) => !v)}
+                style={[styles.whenToggleBtn, whenDraftHasTime && styles.whenToggleBtnOn]}>
+                <Text style={[styles.whenToggleBtnText, whenDraftHasTime && styles.whenToggleBtnTextOn]}>
+                  {whenDraftHasTime ? 'On' : 'Off'}
+                </Text>
+              </Pressable>
+            </View>
+            {whenDraftHasTime ? (
+              <View style={styles.whenPickerBlock}>
+                <Text style={styles.label}>Time</Text>
+                <DateTimePicker
+                  value={whenDraft}
+                  mode="time"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={onWhenTimeChange}
+                />
+              </View>
+            ) : null}
+            <View style={styles.modalActions}>
+              <Pressable onPress={() => setWhenEditorOpen(false)}>
+                <Text style={styles.cancel}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={saveWhenEditor} style={styles.modalPrimary}>
+                <Text style={styles.modalPrimaryText}>Save</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -926,6 +1127,18 @@ const styles = StyleSheet.create({
   },
   bannerText: { fontFamily: fonts.sansRegular, fontSize: 14, color: theme.textPrimary },
   uploadPhase: { fontFamily: fonts.sansMedium, fontSize: 14, color: theme.textSecondary, marginBottom: 8 },
+  topBackBtn: {
+    alignSelf: 'flex-start',
+    minWidth: 40,
+    minHeight: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    backgroundColor: theme.cardBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
   stepHeader: {
     marginBottom: 12,
     padding: 12,
@@ -966,6 +1179,28 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 10 },
   fieldGrow: { flex: 1, marginBottom: 12 },
   field: { marginBottom: 12 },
+  whenCard: {
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    backgroundColor: theme.cardBg,
+    padding: 12,
+    gap: 8,
+  },
+  whenLabel: { fontFamily: fonts.sansMedium, fontSize: 13, color: theme.textSecondary },
+  whenValue: { fontFamily: fonts.sansSemiBold, fontSize: 16, color: theme.textPrimary },
+  whenEditBtn: {
+    alignSelf: 'flex-start',
+    minHeight: 36,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    justifyContent: 'center',
+    backgroundColor: theme.bgSecondary,
+  },
+  whenEditBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: theme.textSecondary },
   label: {
     fontFamily: fonts.sansMedium,
     fontSize: 13,
@@ -1089,35 +1324,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 24,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     gap: 12,
   },
-  stepLeftActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  stepCancelBtn: {
-    minHeight: 48,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.cardBorder,
-    backgroundColor: theme.cardBg,
-    justifyContent: 'center',
-  },
-  stepCancelBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: theme.textSecondary },
-  stepBackBtn: {
-    minHeight: 48,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.cardBorder,
-    backgroundColor: theme.cardBg,
-    justifyContent: 'center',
-  },
-  stepBackBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: theme.textSecondary },
   stepNextBtn: {
     minHeight: 48,
     paddingHorizontal: 18,
@@ -1131,9 +1341,20 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 24,
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    alignItems: 'stretch',
+    gap: 10,
   },
+  deleteBtn: {
+    minHeight: 52,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 74, 58, 0.35)',
+    backgroundColor: 'rgba(139, 74, 58, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: theme.error },
   singleSubmit: { marginTop: 0, marginBottom: 0, flex: 1 },
   modalBackdrop: {
     flex: 1,
@@ -1171,6 +1392,39 @@ const styles = StyleSheet.create({
   },
   modalPrimaryText: { fontFamily: fonts.sansSemiBold, fontSize: 16, color: theme.textPrimary },
   error: { fontFamily: fonts.sansRegular, fontSize: 14, color: theme.error },
+  whenPickerBlock: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    backgroundColor: theme.bgSecondary,
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 4,
+    gap: 6,
+  },
+  whenToggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  whenToggleBtn: {
+    minWidth: 58,
+    minHeight: 34,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.cardBg,
+    paddingHorizontal: 10,
+  },
+  whenToggleBtnOn: {
+    borderColor: 'rgba(167, 183, 201, 0.65)',
+    backgroundColor: theme.pillBg,
+  },
+  whenToggleBtnText: { fontFamily: fonts.sansMedium, fontSize: 13, color: theme.textSecondary },
+  whenToggleBtnTextOn: { fontFamily: fonts.sansSemiBold, color: theme.pillFg },
   pickerCard: {
     borderRadius: 16,
     padding: 16,

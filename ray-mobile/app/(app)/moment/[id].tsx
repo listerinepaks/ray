@@ -121,9 +121,6 @@ export default function MomentEntryScreen() {
                 <Text style={styles.navAction}>Edit moment</Text>
               </Pressable>
             ) : null}
-            <Pressable onPress={() => router.push('/moment/new')} hitSlop={8}>
-              <Text style={styles.navAction}>+ New moment</Text>
-            </Pressable>
             {moment.my_access ? (
               <View style={styles.accessPill}>
                 <Text style={styles.accessPillText}>{moment.my_access}</Text>
