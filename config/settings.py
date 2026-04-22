@@ -122,6 +122,37 @@ STATIC_ROOT = BASE_DIR / "static"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
+_storage_backend = os.environ.get("DJANGO_STORAGE_BACKEND", "").strip().lower()
+if _storage_backend == "s3":
+    _bucket_name = os.environ.get("AWS_STORAGE_BUCKET_NAME", "").strip()
+    if not _bucket_name:
+        raise ValueError("AWS_STORAGE_BUCKET_NAME must be set when DJANGO_STORAGE_BACKEND=s3")
+
+    STORAGES["default"] = {
+        "BACKEND": "config.storage_backends.PrivateMediaStorage",
+    }
+
+    AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID", "").strip()
+    AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "").strip()
+    AWS_STORAGE_BUCKET_NAME = _bucket_name
+    AWS_S3_REGION_NAME = os.environ.get("AWS_S3_REGION_NAME", "").strip() or None
+    AWS_S3_ENDPOINT_URL = os.environ.get("AWS_S3_ENDPOINT_URL", "").strip() or None
+    AWS_S3_CUSTOM_DOMAIN = os.environ.get("AWS_S3_CUSTOM_DOMAIN", "").strip() or None
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = True
+    AWS_QUERYSTRING_EXPIRE = int(os.environ.get("AWS_QUERYSTRING_EXPIRE", "3600"))
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_S3_VERIFY = os.environ.get("AWS_S3_VERIFY", "1") == "1"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {

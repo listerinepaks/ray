@@ -13,6 +13,7 @@ dependencies = [
 [project.optional-dependencies]
 prod = [
     "gunicorn>=22.0,<24",
+    "django-storages[s3]>=1.14,<2.0",
 ]
 
 [build-system]

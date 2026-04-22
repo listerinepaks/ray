@@ -15,6 +15,8 @@ python manage.py runserver
 
 Session and basic auth are enabled. For browser clients on another origin (e.g. the Vite dev server), CORS and `CSRF_TRUSTED_ORIGINS` are configured for `http://localhost:5173` and `http://127.0.0.1:5173`.
 
+Uploads use the local filesystem by default (`./media`). To switch photo storage to a private S3-compatible bucket, install the production extras and set `DJANGO_STORAGE_BACKEND=s3` plus the `AWS_*` variables shown in `.env.example`.
+
 ## Web app (`ray-web`)
 
 ```bash
@@ -105,7 +107,7 @@ Deploy tree assumed: **`/opt/ray`** (adjust paths in `nginx/nginx-production.con
 
    - **`/`** → static SPA from `/opt/ray/ray-web/dist` (`try_files` → `index.html` for client routes).
    - **`/api/`**, **`/admin/`** → Gunicorn via unix socket.
-   - **`/static/`**, **`/media/`** → Django `collectstatic` output and user uploads.
+   - **`/static/`**, **`/media/`** → Django `collectstatic` output and user uploads when using local filesystem media.
 
 7. **Gunicorn**: Edit `supervisorctl/supervisord.conf` so **`command=`** points at your venv’s `gunicorn` (e.g. `/opt/ray/.venv/bin/gunicorn`), **`user=`** matches the account that owns `/opt/ray`, and **`directory=`** is `/opt/ray`. Install the `[program:gunicorn]` section, then `supervisorctl reread && supervisorctl update && supervisorctl start ray:gunicorn`.
 
@@ -120,6 +122,46 @@ Deploy tree assumed: **`/opt/ray`** (adjust paths in `nginx/nginx-production.con
    With nginx as above, the built files belong at **`/opt/ray/ray-web/dist`**. No `VITE_API_URL` is required if the site and API share **https://ray.wright5.us** (the app uses `window.location.origin` in production).
 
 9. **SQLite**: Default DB is `db.sqlite3` in the project root — **back it up** (copy/backup) before upgrades. For heavier load, switch to Postgres later and point `DATABASES` in `config/settings.py` via environment variables.
+
+### Private S3 media storage
+
+If you want uploaded photos in a private S3-compatible bucket instead of `/opt/ray/media`:
+
+```bash
+cd /opt/ray
+source .venv/bin/activate
+pip install -e ".[prod]"
+set -a && source /opt/ray/.env && set +a
+python manage.py check
+```
+
+Set these env vars in `/opt/ray/.env`:
+
+```bash
+DJANGO_STORAGE_BACKEND=s3
+AWS_STORAGE_BUCKET_NAME=ray-media
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+AWS_S3_REGION_NAME=us-east-1
+```
+
+Optional for S3-compatible providers:
+
+```bash
+AWS_S3_ENDPOINT_URL=https://<provider-endpoint>
+AWS_S3_CUSTOM_DOMAIN=<cdn-or-custom-hostname>
+AWS_QUERYSTRING_EXPIRE=3600
+AWS_S3_VERIFY=1
+```
+
+Recommended bucket posture:
+
+- Block all public access.
+- Keep object ACLs disabled.
+- Enable bucket encryption.
+- Enable versioning if you want recovery from deletes or overwrites.
+
+With `DJANGO_STORAGE_BACKEND=s3`, uploaded photos still use the same `people/` and `moments/` prefixes from the Django models; you do not need to create folders in the bucket first.
 
 ### Deploy / upgrade (repeat)
 
