@@ -127,10 +127,6 @@ export function Profile() {
         <div className="profile-hero-copy">
           <p className="profile-kicker">Your profile</p>
           <h1>{profile?.display_name || profile?.username || 'Profile'}</h1>
-          <p className="profile-subtle">
-            This is the shared person record linked to your account. If someone joins later, their
-            login can attach to the same person entry.
-          </p>
         </div>
       </div>
 

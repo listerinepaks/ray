@@ -155,10 +155,6 @@ export default function ProfileScreen() {
         <View style={styles.heroCopy}>
           <Text style={styles.kicker}>Your profile</Text>
           <Text style={styles.heroTitle}>{profile?.display_name || profile?.username || 'Profile'}</Text>
-          <Text style={styles.heroBody}>
-            This is the shared person record linked to your account. Someone can later join and
-            claim the same person entry.
-          </Text>
         </View>
       </View>
 
@@ -310,12 +306,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.serifSemi,
     fontSize: 28,
     color: theme.textPrimary,
-  },
-  heroBody: {
-    fontFamily: fonts.sansRegular,
-    fontSize: 15,
-    lineHeight: 22,
-    color: theme.textSecondary,
   },
   banner: {
     padding: 14,
