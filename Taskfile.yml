@@ -17,6 +17,11 @@ tasks:
     cmds:
       - task --list
 
+  git:pull:
+    desc: Pull latest changes for current branch
+    cmds:
+      - git pull --ff-only
+
   api:migrate:
     desc: Apply Django migrations
     cmds:
