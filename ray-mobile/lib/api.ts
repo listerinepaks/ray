@@ -69,8 +69,7 @@ export type Profile = {
   avatar: string | null;
   moments_authored: number;
   moments_shared_with_me: number;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
 };
 
 export async function fetchMe(): Promise<Me | null> {

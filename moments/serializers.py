@@ -41,7 +41,6 @@ class ProfileSerializer(serializers.ModelSerializer):
             "moments_authored",
             "moments_shared_with_me",
             "created_at",
-            "updated_at",
         ]
         read_only_fields = [
             "username",
@@ -49,7 +48,6 @@ class ProfileSerializer(serializers.ModelSerializer):
             "moments_authored",
             "moments_shared_with_me",
             "created_at",
-            "updated_at",
         ]
 
     def get_moments_authored(self, obj):

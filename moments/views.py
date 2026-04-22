@@ -67,7 +67,6 @@ class ProfileMeView(APIView):
             "moments_authored": user.moments_authored.count(),
             "moments_shared_with_me": user.moment_access.exclude(moment__author=user).count(),
             "created_at": None,
-            "updated_at": None,
         }
 
     def get(self, request):
