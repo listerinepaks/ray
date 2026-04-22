@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   createMoment,
   createPerson,
+  deleteMoment,
   deleteMomentPhoto,
   fetchMoment,
   fetchPeople,
@@ -91,6 +92,7 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
   photosRef.current = photos
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [uploadPhase, setUploadPhase] = useState<string | null>(null)
   const [loadingMoment, setLoadingMoment] = useState(false)
   const [momentLoadError, setMomentLoadError] = useState<string | null>(null)
@@ -382,6 +384,22 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
     } finally {
       setSubmitting(false)
       setUploadPhase(null)
+    }
+  }
+
+  async function onDeleteMoment() {
+    if (!isEdit || editId == null || deleting) return
+    const ok = window.confirm('Delete this moment permanently? This also removes its photos.')
+    if (!ok) return
+    setSubmitError(null)
+    setDeleting(true)
+    try {
+      await deleteMoment(editId)
+      navigate('/', { replace: true })
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Could not delete this moment.')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -782,7 +800,17 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
             >
               Cancel
             </Link>
-            <button type="submit" className="login-btn create-submit" disabled={submitting}>
+            {isEdit ? (
+              <button
+                type="button"
+                className="btn-secondary create-delete"
+                onClick={() => void onDeleteMoment()}
+                disabled={submitting || deleting}
+              >
+                {deleting ? 'Deleting…' : 'Delete moment'}
+              </button>
+            ) : null}
+            <button type="submit" className="login-btn create-submit" disabled={submitting || deleting}>
               {submitting ? 'Saving…' : isEdit ? 'Save changes' : 'Save moment'}
             </button>
           </div>

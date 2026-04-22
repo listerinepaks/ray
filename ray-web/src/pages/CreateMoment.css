@@ -513,6 +513,16 @@
   min-width: 10rem;
 }
 
+.create-delete {
+  border-color: rgba(139, 74, 58, 0.25);
+  color: #8b4a3a;
+}
+
+.create-delete:hover {
+  background: #fdf4f0;
+  border-color: rgba(139, 74, 58, 0.4);
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
