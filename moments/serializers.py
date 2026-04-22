@@ -20,6 +20,7 @@ class PersonSerializer(serializers.ModelSerializer):
 
 
 class ProfileSerializer(serializers.ModelSerializer):
+    person_id = serializers.IntegerField(source="id", read_only=True)
     username = serializers.CharField(source="linked_user.username", read_only=True)
     email = serializers.EmailField(source="linked_user.email", read_only=True)
     display_name = serializers.CharField(source="name")
@@ -31,6 +32,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Person
         fields = [
+            "person_id",
             "username",
             "email",
             "display_name",

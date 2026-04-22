@@ -15,16 +15,26 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { fonts, theme } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchProfile, mediaUrl, updateProfile, type PhotoUpload, type Profile } from '@/lib/api';
+import {
+  fetchPeople,
+  fetchProfile,
+  mediaUrl,
+  updateProfile,
+  type Person,
+  type PhotoUpload,
+  type Profile,
+} from '@/lib/api';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { logout } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [people, setPeople] = useState<Person[]>([]);
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [avatarDraft, setAvatarDraft] = useState<PhotoUpload | null>(null);
+  const [claimPersonId, setClaimPersonId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,9 +46,10 @@ export default function ProfileScreen() {
       try {
         setLoading(true);
         setError(null);
-        const data = await fetchProfile();
+        const [data, sharedPeople] = await Promise.all([fetchProfile(), fetchPeople()]);
         if (cancelled) return;
         setProfile(data);
+        setPeople(sharedPeople);
         setDisplayName(data.display_name);
         setBio(data.bio);
       } catch (e) {
@@ -102,6 +113,27 @@ export default function ProfileScreen() {
     }
   }
 
+  async function claimPerson() {
+    if (claimPersonId == null) return;
+    setSaving(true);
+    setError(null);
+    setSaveMessage(null);
+    try {
+      const next = await updateProfile({ person_id: claimPersonId });
+      setProfile(next);
+      setDisplayName(next.display_name);
+      setBio(next.bio);
+      setClaimPersonId(null);
+      setSaveMessage('Person claimed.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not claim this person.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const claimablePeople = people.filter((p) => p.linked_user == null);
+
   return (
     <ScrollView
       style={styles.root}
@@ -139,6 +171,39 @@ export default function ProfileScreen() {
 
       {profile ? (
         <View style={styles.card}>
+          {profile.person_id == null ? (
+            <View style={styles.claimCard}>
+              <Text style={styles.claimTitle}>Claim an existing person</Text>
+              <Text style={styles.claimBody}>
+                If someone already added you, claim that shared person entry instead of creating a
+                duplicate.
+              </Text>
+              {claimablePeople.map((person) => {
+                const selected = claimPersonId === person.id;
+                return (
+                  <Pressable
+                    key={person.id}
+                    onPress={() => setClaimPersonId(person.id)}
+                    style={[styles.claimOption, selected && styles.claimOptionSelected]}>
+                    <Text style={[styles.claimOptionText, selected && styles.claimOptionTextSelected]}>
+                      {person.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+              {claimablePeople.length === 0 ? (
+                <Text style={styles.saved}>No unclaimed shared people are available right now.</Text>
+              ) : (
+                <Pressable
+                  onPress={() => void claimPerson()}
+                  disabled={claimPersonId == null || saving}
+                  style={styles.secondaryBtn}>
+                  <Text style={styles.secondaryBtnText}>Claim person</Text>
+                </Pressable>
+              )}
+            </View>
+          ) : null}
+
           <View style={styles.field}>
             <Text style={styles.label}>Display name</Text>
             <TextInput
@@ -269,6 +334,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.cardBorder,
   },
+  claimCard: {
+    gap: 10,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: theme.bgSecondary,
+  },
+  claimTitle: { fontFamily: fonts.sansSemiBold, fontSize: 16, color: theme.textPrimary },
+  claimBody: { fontFamily: fonts.sansRegular, fontSize: 14, lineHeight: 20, color: theme.textSecondary },
+  claimOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    backgroundColor: theme.cardBg,
+  },
+  claimOptionSelected: {
+    borderColor: theme.accentGolden,
+    backgroundColor: 'rgba(244, 201, 93, 0.14)',
+  },
+  claimOptionText: { fontFamily: fonts.sansMedium, fontSize: 15, color: theme.textPrimary },
+  claimOptionTextSelected: { fontFamily: fonts.sansSemiBold },
   field: { gap: 6 },
   label: { fontFamily: fonts.sansMedium, fontSize: 14, color: theme.textSecondary },
   input: {

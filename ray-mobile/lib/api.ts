@@ -61,6 +61,7 @@ export type Me = {
 };
 
 export type Profile = {
+  person_id: number | null;
   username: string;
   email: string;
   display_name: string;
@@ -112,12 +113,14 @@ export async function fetchProfile(): Promise<Profile> {
 }
 
 export async function updateProfile(payload: {
+  person_id?: number;
   display_name?: string;
   bio?: string;
   avatar?: PhotoUpload;
 }): Promise<Profile> {
   const base = getApiBase();
   const body = new FormData();
+  if (payload.person_id !== undefined) body.append('person_id', String(payload.person_id));
   if (payload.display_name !== undefined) body.append('display_name', payload.display_name);
   if (payload.bio !== undefined) body.append('bio', payload.bio);
   if (payload.avatar) {

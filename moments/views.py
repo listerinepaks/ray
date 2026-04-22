@@ -42,31 +42,76 @@ class ProfileMeView(APIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_object(self):
-        person = (
+        return (
             Person.objects.filter(linked_user=self.request.user)
             .order_by("id")
             .first()
         )
-        if person is not None:
-            return person
-        default_name = (
+
+    def _default_name(self):
+        return (
             self.request.user.get_full_name().strip()
             or self.request.user.first_name.strip()
             or self.request.user.username
         )
-        return Person.objects.create(
-            created_by=self.request.user,
-            linked_user=self.request.user,
-            name=default_name,
-        )
+
+    def _serialize_unlinked(self):
+        user = self.request.user
+        return {
+            "person_id": None,
+            "username": user.username,
+            "email": user.email,
+            "display_name": self._default_name(),
+            "bio": "",
+            "avatar": None,
+            "moments_authored": user.moments_authored.count(),
+            "moments_shared_with_me": user.moment_access.exclude(moment__author=user).count(),
+            "created_at": None,
+            "updated_at": None,
+        }
 
     def get(self, request):
-        serializer = ProfileSerializer(self.get_object(), context={"request": request})
+        person = self.get_object()
+        if person is None:
+            return Response(self._serialize_unlinked())
+        serializer = ProfileSerializer(person, context={"request": request})
         return Response(serializer.data)
 
     def patch(self, request):
+        person = self.get_object()
+        person_id = request.data.get("person_id")
+
+        if person_id not in (None, "", "null"):
+            try:
+                person_id = int(person_id)
+            except (TypeError, ValueError):
+                return Response({"person_id": ["Enter a valid person id."]}, status=400)
+        else:
+            person_id = None
+
+        if person is None:
+            if person_id is not None:
+                try:
+                    person = Person.objects.get(pk=person_id)
+                except Person.DoesNotExist:
+                    return Response({"person_id": ["That person does not exist."]}, status=400)
+                if person.linked_user_id is not None and person.linked_user_id != request.user.id:
+                    return Response({"person_id": ["That person has already been claimed."]}, status=400)
+                person.linked_user = request.user
+                if not person.created_by_id:
+                    person.created_by = request.user
+                person.save(update_fields=["linked_user", "created_by"])
+            else:
+                person = Person.objects.create(
+                    created_by=request.user,
+                    linked_user=request.user,
+                    name=self._default_name(),
+                )
+        elif person_id is not None and person_id != person.id:
+            return Response({"person_id": ["Your account is already linked to a different person."]}, status=400)
+
         serializer = ProfileSerializer(
-            self.get_object(),
+            person,
             data=request.data,
             partial=True,
             context={"request": request},

@@ -332,6 +332,38 @@
   box-shadow: 0 1px 2px rgba(47, 47, 47, 0.05);
 }
 
+.profile-claim {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1rem;
+  border-radius: 14px;
+  background: var(--bg-secondary);
+}
+
+.profile-claim-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.profile-claim-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.profile-claim-row select {
+  min-width: 14rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid rgba(47, 47, 47, 0.12);
+  font-size: 1rem;
+  font-family: Inter, sans-serif;
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
 .profile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));

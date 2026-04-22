@@ -1,14 +1,23 @@
 import { useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 
-import { fetchProfile, mediaUrl, updateProfile, type Profile as ProfileType } from '../api'
+import {
+  fetchPeople,
+  fetchProfile,
+  mediaUrl,
+  updateProfile,
+  type Person,
+  type Profile as ProfileType,
+} from '../api'
 
 export function Profile() {
   const [profile, setProfile] = useState<ProfileType | null>(null)
+  const [people, setPeople] = useState<Person[]>([])
   const [displayName, setDisplayName] = useState('')
   const [bio, setBio] = useState('')
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [claimPersonId, setClaimPersonId] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -20,9 +29,10 @@ export function Profile() {
       try {
         setLoading(true)
         setError(null)
-        const data = await fetchProfile()
+        const [data, sharedPeople] = await Promise.all([fetchProfile(), fetchPeople()])
         if (cancelled) return
         setProfile(data)
+        setPeople(sharedPeople)
         setDisplayName(data.display_name)
         setBio(data.bio)
       } catch (e) {
@@ -80,7 +90,27 @@ export function Profile() {
     }
   }
 
+  async function onClaimPerson() {
+    if (!claimPersonId) return
+    setSaving(true)
+    setError(null)
+    setSaveMessage(null)
+    try {
+      const next = await updateProfile({ person_id: Number(claimPersonId) })
+      setProfile(next)
+      setDisplayName(next.display_name)
+      setBio(next.bio)
+      setClaimPersonId('')
+      setSaveMessage('Person claimed.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not claim this person.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const avatarSrc = avatarPreview || mediaUrl(profile?.avatar)
+  const claimablePeople = people.filter((p) => p.linked_user == null)
 
   return (
     <section className="profile-page">
@@ -114,6 +144,41 @@ export function Profile() {
       {profile ? (
         <form className="profile-form" onSubmit={onSubmit}>
           <div className="profile-card">
+            {profile.person_id == null ? (
+              <div className="profile-claim">
+                <p className="profile-claim-title">Claim an existing person</p>
+                <p className="profile-subtle">
+                  If someone already added you, claim that shared person entry instead of creating a
+                  duplicate.
+                </p>
+                {claimablePeople.length > 0 ? (
+                  <div className="profile-claim-row">
+                    <select
+                      value={claimPersonId}
+                      onChange={(e) => setClaimPersonId(e.target.value)}
+                    >
+                      <option value="">Choose a person…</option>
+                      {claimablePeople.map((person) => (
+                        <option key={person.id} value={person.id}>
+                          {person.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => void onClaimPerson()}
+                      disabled={!claimPersonId || saving}
+                    >
+                      Claim person
+                    </button>
+                  </div>
+                ) : (
+                  <p className="muted">No unclaimed shared people are available right now.</p>
+                )}
+              </div>
+            ) : null}
+
             <div className="profile-grid">
               <label className="field">
                 <span>Display name</span>
