@@ -9,7 +9,7 @@ class Person(models.Model):
         related_name="people_created",
     )
     name = models.CharField(max_length=120)
-    linked_user = models.ForeignKey(
+    linked_user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,

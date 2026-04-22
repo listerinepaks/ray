@@ -3,6 +3,7 @@ from django.http import Http404
 from rest_framework import status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
@@ -12,6 +13,7 @@ from .permissions import (
     CommentPermission,
     MomentEditPermission,
     MomentPhotoPermission,
+    PersonPermission,
     ReactionPermission,
 )
 from .serializers import (
@@ -19,19 +21,59 @@ from .serializers import (
     MomentPhotoSerializer,
     MomentSerializer,
     PersonSerializer,
+    ProfileSerializer,
     ReactionSerializer,
 )
 
 
 class PersonViewSet(ModelViewSet):
     serializer_class = PersonSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [PersonPermission]
 
     def get_queryset(self):
-        return Person.objects.filter(created_by=self.request.user)
+        return Person.objects.select_related("linked_user", "created_by").all().order_by("name", "id")
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+
+class ProfileMeView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_object(self):
+        person = (
+            Person.objects.filter(linked_user=self.request.user)
+            .order_by("id")
+            .first()
+        )
+        if person is not None:
+            return person
+        default_name = (
+            self.request.user.get_full_name().strip()
+            or self.request.user.first_name.strip()
+            or self.request.user.username
+        )
+        return Person.objects.create(
+            created_by=self.request.user,
+            linked_user=self.request.user,
+            name=default_name,
+        )
+
+    def get(self, request):
+        serializer = ProfileSerializer(self.get_object(), context={"request": request})
+        return Response(serializer.data)
+
+    def patch(self, request):
+        serializer = ProfileSerializer(
+            self.get_object(),
+            data=request.data,
+            partial=True,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
 
 class MomentViewSet(ModelViewSet):

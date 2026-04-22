@@ -56,6 +56,18 @@ export type Me = {
   email: string
 }
 
+export type Profile = {
+  username: string
+  email: string
+  display_name: string
+  bio: string
+  avatar: string | null
+  moments_authored: number
+  moments_shared_with_me: number
+  created_at: string
+  updated_at: string
+}
+
 export async function ensureCsrfCookie(): Promise<void> {
   const base = getApiBase()
   await fetch(`${base}/api/auth/csrf/`, { credentials: 'include' })
@@ -109,6 +121,41 @@ export async function postLogout(): Promise<void> {
     },
   })
   if (!res.ok) throw new Error(await parseErrorBody(res))
+}
+
+export async function fetchProfile(): Promise<Profile> {
+  const base = getApiBase()
+  const res = await fetch(`${base}/api/profile/me/`, {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await parseErrorBody(res))
+  return res.json() as Promise<Profile>
+}
+
+export async function updateProfile(payload: {
+  display_name?: string
+  bio?: string
+  avatar?: File
+}): Promise<Profile> {
+  await ensureCsrfCookie()
+  const token = getCsrfTokenFromDocument()
+  const base = getApiBase()
+  const body = new FormData()
+  if (payload.display_name !== undefined) body.append('display_name', payload.display_name)
+  if (payload.bio !== undefined) body.append('bio', payload.bio)
+  if (payload.avatar) body.append('avatar', payload.avatar)
+  const res = await fetch(`${base}/api/profile/me/`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { 'X-CSRFToken': token } : {}),
+    },
+    body,
+  })
+  if (!res.ok) throw new Error(await parseErrorBody(res))
+  return res.json() as Promise<Profile>
 }
 
 export type MomentPhoto = {

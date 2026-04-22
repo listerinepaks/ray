@@ -112,7 +112,7 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
           setShareUsers(u.filter((x) => x.id !== currentUser.id))
         }
       } catch {
-        if (!cancelled) setSubmitError('Could not load people or users for sharing.')
+        if (!cancelled) setSubmitError('Could not load people or users.')
       } finally {
         if (!cancelled) setLoadingRefs(false)
       }
@@ -682,7 +682,7 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
                 </div>
                 {people.length === 0 ? (
                   <p className="muted">
-                    You don’t have anyone in your list yet. Add a name to tag them on moments.
+                    No shared people yet. Add someone to tag them on moments.
                   </p>
                 ) : (
                   <ul className="people-pick">
@@ -794,7 +794,7 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
             <h2 id="modal-title" className="modal-title">
               Add someone
             </h2>
-            <p className="modal-copy">They’ll appear in your list for tagging on any moment.</p>
+            <p className="modal-copy">They’ll appear in the shared people list for tagging on any moment.</p>
             <form onSubmit={onAddPerson}>
               <label className="create-field">
                 <span>Name</span>
@@ -807,7 +807,7 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
                 />
               </label>
               <label className="create-field">
-                <span>Note (optional)</span>
+                <span>Bio or note (optional)</span>
                 <input
                   value={newPersonNote}
                   onChange={(e) => setNewPersonNote(e.target.value)}

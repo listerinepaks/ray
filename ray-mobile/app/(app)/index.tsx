@@ -32,7 +32,7 @@ export default function TimelineScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const navigation = useNavigation();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [moments, setMoments] = useState<Moment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -59,10 +59,10 @@ export default function TimelineScreen() {
     navigation.setOptions({
       headerLeft: () => (
         <Pressable
-          onPress={() => void logout()}
+          onPress={() => router.push('/profile')}
           hitSlop={12}
           style={{ paddingHorizontal: 4, paddingVertical: 8 }}>
-          <Text style={styles.headerSide}>Sign out</Text>
+          <Text style={styles.headerSide}>Profile</Text>
         </Pressable>
       ),
       headerRight: () => (
@@ -74,7 +74,7 @@ export default function TimelineScreen() {
         </Pressable>
       ),
     });
-  }, [navigation, logout, router]);
+  }, [navigation, router]);
 
   return (
     <ScrollView

@@ -33,6 +33,7 @@ export default function AppGroupLayout() {
         headerShadowVisible: false,
       }}>
       <Stack.Screen name="index" options={{ title: 'Ray', headerLargeTitle: true }} />
+      <Stack.Screen name="profile" options={{ title: 'Profile' }} />
       <Stack.Screen
         name="moment/new"
         options={{

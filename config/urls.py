@@ -10,6 +10,7 @@ from moments.views import (
     MomentPhotoViewSet,
     MomentViewSet,
     PersonViewSet,
+    ProfileMeView,
     ReactionViewSet,
 )
 
@@ -26,6 +27,7 @@ urlpatterns = [
     path("api/auth/logout/", auth_views.auth_logout),
     path("api/auth/me/", auth_views.AuthMeView.as_view()),
     path("api/auth/users/", auth_views.AuthUsersView.as_view()),
+    path("api/profile/me/", ProfileMeView.as_view()),
     path("api/auth/token/", auth_views.auth_token_obtain),
     path("api/auth/token/revoke/", auth_views.auth_token_revoke),
     path("api/", include(router.urls)),

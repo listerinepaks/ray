@@ -138,7 +138,7 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
           setShareUsers(u.filter((x) => x.id !== currentUser.id));
         }
       } catch {
-        if (!cancelled) setSubmitError('Could not load people or users for sharing.');
+        if (!cancelled) setSubmitError('Could not load people or users.');
       } finally {
         if (!cancelled) setLoadingRefs(false);
       }
@@ -578,19 +578,23 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
                     <Text style={styles.link}>+ Add person</Text>
                   </Pressable>
                 </View>
-                <View style={styles.chipWrap}>
-                  {people.map((p) => {
-                    const on = selectedPeople.has(p.id);
-                    return (
-                      <Pressable
-                        key={p.id}
-                        onPress={() => togglePerson(p.id)}
-                        style={[styles.chip, on && styles.chipOn]}>
-                        <Text style={[styles.chipText, on && styles.chipTextOn]}>{p.name}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                {people.length === 0 ? (
+                  <Text style={styles.muted}>No shared people yet. Add someone to tag them on moments.</Text>
+                ) : (
+                  <View style={styles.chipWrap}>
+                    {people.map((p) => {
+                      const on = selectedPeople.has(p.id);
+                      return (
+                        <Pressable
+                          key={p.id}
+                          onPress={() => togglePerson(p.id)}
+                          style={[styles.chip, on && styles.chipOn]}>
+                          <Text style={[styles.chipText, on && styles.chipTextOn]}>{p.name}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
             ) : null}
 
@@ -726,6 +730,7 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>New person</Text>
+            <Text style={styles.muted}>They’ll appear in the shared people list for tagging on any moment.</Text>
             <TextInput
               value={newPersonName}
               onChangeText={setNewPersonName}
@@ -736,7 +741,7 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
             <TextInput
               value={newPersonNote}
               onChangeText={setNewPersonNote}
-              placeholder="Note (optional)"
+              placeholder="Bio or note (optional)"
               placeholderTextColor={theme.textMuted}
               style={[styles.input, styles.textArea]}
               multiline

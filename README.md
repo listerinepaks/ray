@@ -38,6 +38,7 @@ The app uses **session auth**: sign in on the page (POST `/api/auth/login/` with
 - `POST` `/api/auth/logout/`
 - `GET` `/api/auth/me/` — `401` if anonymous
 - `GET` `/api/auth/users/` — `{ "users": [ { "id", "username" }, ... ] }` for custom sharing pickers (small deployments)
+- `GET`, `PATCH` `/api/profile/me/` — the signed-in user’s linked person/profile (`display_name`, `bio`, optional `avatar`)
 
 **Photos (multipart, edit access on the moment)**
 
@@ -48,7 +49,7 @@ The app uses **session auth**: sign in on the page (POST `/api/auth/login/` with
 
 - `GET`, `POST` `/api/moments/`
 - `GET`, `PUT`, `PATCH`, `DELETE` `/api/moments/{id}/`
-- `GET`, `POST` `/api/people/`
+- `GET`, `POST` `/api/people/` — shared canonical people
 - `GET`, `PUT`, `PATCH`, `DELETE` `/api/people/{id}/`
 
 **Comments & reactions** (nested under a moment; require access on that moment)
@@ -62,6 +63,7 @@ The app uses **session auth**: sign in on the page (POST `/api/auth/login/` with
 
 - Listing a moment requires any row in `MomentAccess` for you (or authorship, represented as edit access).
 - Updating or deleting a moment requires **edit** access on that moment.
+- People are shared records. Any signed-in user can list them; edits are limited to the linked user or original creator.
 - Creating comments and reactions requires **comment** or **edit** access. Editing or deleting a comment is allowed for the comment author or anyone with edit on the moment. Deleting a reaction is allowed for the reacting user or anyone with edit on the moment.
 
 Moment responses include `my_access` (`view`, `comment`, `edit`, or `null`) for the current user.

@@ -16,7 +16,49 @@ class PersonSerializer(serializers.ModelSerializer):
             "note",
             "created_at",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "linked_user", "profile_photo", "created_at"]
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="linked_user.username", read_only=True)
+    email = serializers.EmailField(source="linked_user.email", read_only=True)
+    display_name = serializers.CharField(source="name")
+    bio = serializers.CharField(source="note", required=False, allow_blank=True)
+    avatar = serializers.ImageField(source="profile_photo", required=False, allow_null=True)
+    moments_authored = serializers.SerializerMethodField()
+    moments_shared_with_me = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Person
+        fields = [
+            "username",
+            "email",
+            "display_name",
+            "bio",
+            "avatar",
+            "moments_authored",
+            "moments_shared_with_me",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "username",
+            "email",
+            "moments_authored",
+            "moments_shared_with_me",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_moments_authored(self, obj):
+        if obj.linked_user_id is None:
+            return 0
+        return obj.linked_user.moments_authored.count()
+
+    def get_moments_shared_with_me(self, obj):
+        if obj.linked_user_id is None:
+            return 0
+        return obj.linked_user.moment_access.exclude(moment__author=obj.linked_user).count()
 
 
 class MomentPhotoSerializer(serializers.ModelSerializer):
@@ -153,7 +195,6 @@ class MomentSerializer(serializers.ModelSerializer):
             person.id: person
             for person in Person.objects.filter(
                 id__in=person_ids,
-                created_by=moment.author,
             )
         }
 

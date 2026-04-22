@@ -12,6 +12,7 @@ import {
 import { RayLogo } from './components/RayLogo'
 import { CreateMoment } from './pages/CreateMoment'
 import { EntryView } from './pages/EntryView'
+import { Profile } from './pages/Profile'
 import { Timeline } from './pages/Timeline'
 import './App.css'
 
@@ -161,6 +162,9 @@ function App() {
             </div>
           </div>
           <div className="header-actions">
+            <Link to="/profile" className="btn-secondary">
+              Profile
+            </Link>
             <Link to="/moments/new" className="header-new">
               New moment
             </Link>
@@ -178,6 +182,7 @@ function App() {
             <Timeline moments={moments} loading={loadingMoments} error={error} />
           }
         />
+        <Route path="/profile" element={<Profile />} />
         <Route path="/moments/new" element={<CreateMoment currentUser={user} />} />
         <Route path="/moments/:id/edit" element={<CreateMoment currentUser={user} />} />
         <Route path="/moments/:id" element={<EntryView />} />

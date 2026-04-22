@@ -1,0 +1,24 @@
+from django.conf import settings
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+        ("moments", "0002_moment_bible_verse"),
+    ]
+
+    operations = [
+        migrations.AlterField(
+            model_name="person",
+            name="linked_user",
+            field=models.OneToOneField(
+                blank=True,
+                null=True,
+                on_delete=models.SET_NULL,
+                related_name="person_links",
+                to=settings.AUTH_USER_MODEL,
+            ),
+        ),
+    ]

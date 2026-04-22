@@ -72,3 +72,15 @@ class ReactionPermission(BasePermission):
         if request.method == "DELETE":
             return obj.user_id == request.user.id or can_edit_moment(request.user, obj.moment)
         return False
+
+
+class PersonPermission(BasePermission):
+    """People are shared records; edits are limited to the linked user or original creator."""
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated)
+
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS:
+            return True
+        return obj.linked_user_id == request.user.id or obj.created_by_id == request.user.id
