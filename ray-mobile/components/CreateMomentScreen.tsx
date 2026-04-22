@@ -433,6 +433,22 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
     if (prev) setCreateStep(prev);
   }
 
+  function onExitFlow() {
+    if (isEdit && editId != null) {
+      router.replace(`/moment/${editId}`);
+      return;
+    }
+    router.replace('/');
+  }
+
+  function onBackAction() {
+    if (isWizard && stepIndex > 0) {
+      goToPreviousStep();
+      return;
+    }
+    onExitFlow();
+  }
+
   if (!currentUser) return null;
 
   return (
@@ -776,13 +792,11 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
 
             {isWizard ? (
               <View style={styles.stepActions}>
-                {stepIndex > 0 ? (
-                  <Pressable onPress={goToPreviousStep} style={styles.stepBackBtn}>
-                    <Text style={styles.stepBackBtnText}>Back</Text>
+                <View style={styles.stepLeftActions}>
+                  <Pressable onPress={onBackAction} style={styles.stepCancelBtn}>
+                    <Text style={styles.stepCancelBtnText}>Back</Text>
                   </Pressable>
-                ) : (
-                  <View />
-                )}
+                </View>
                 {createStep !== 'visibility' ? (
                   <Pressable onPress={goToNextStep} style={styles.stepNextBtn}>
                     <Text style={styles.stepNextBtnText}>Next</Text>
@@ -806,20 +820,26 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
                 )}
               </View>
             ) : (
-              <Pressable
-                onPress={() => void onSubmit()}
-                disabled={submitting}
-                style={({ pressed }) => [
-                  styles.submit,
-                  submitting && styles.submitDisabled,
-                  pressed && !submitting && { opacity: 0.94 },
-                ]}>
-                {submitting ? (
-                  <ActivityIndicator color={theme.textPrimary} />
-                ) : (
-                  <Text style={styles.submitText}>{isEdit ? 'Save changes' : 'Create moment'}</Text>
-                )}
-              </Pressable>
+              <View style={styles.singleActions}>
+                <Pressable onPress={onBackAction} style={styles.stepCancelBtn}>
+                  <Text style={styles.stepCancelBtnText}>Back</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => void onSubmit()}
+                  disabled={submitting}
+                  style={({ pressed }) => [
+                    styles.submit,
+                    styles.singleSubmit,
+                    submitting && styles.submitDisabled,
+                    pressed && !submitting && { opacity: 0.94 },
+                  ]}>
+                  {submitting ? (
+                    <ActivityIndicator color={theme.textPrimary} />
+                  ) : (
+                    <Text style={styles.submitText}>{isEdit ? 'Save changes' : 'Create moment'}</Text>
+                  )}
+                </Pressable>
+              </View>
             )}
           </>
         )}
@@ -1073,6 +1093,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  stepLeftActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  stepCancelBtn: {
+    minHeight: 48,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    backgroundColor: theme.cardBg,
+    justifyContent: 'center',
+  },
+  stepCancelBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: theme.textSecondary },
   stepBackBtn: {
     minHeight: 48,
     paddingHorizontal: 16,
@@ -1092,6 +1127,14 @@ const styles = StyleSheet.create({
   },
   stepNextBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: theme.textPrimary },
   stepSubmitBtn: { marginTop: 0, marginBottom: 0, minWidth: 168 },
+  singleActions: {
+    marginTop: 8,
+    marginBottom: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  singleSubmit: { marginTop: 0, marginBottom: 0, flex: 1 },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
