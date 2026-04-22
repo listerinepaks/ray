@@ -14,7 +14,10 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Ray uses your location to show today's sunrise and sunset times."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -30,7 +33,9 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-location",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

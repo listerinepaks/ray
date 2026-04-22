@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { useRouter, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import {
@@ -14,10 +15,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AspectFitImage } from '@/components/AspectFitImage';
-import { RayLogo } from '@/components/RayLogo';
 import { useAuth } from '@/contexts/AuthContext';
 import { fonts, theme } from '@/constants/theme';
 import { formatSmartDate } from '@/lib/formatSmartDate';
+import { getSunriseSunset } from '@/lib/sunTimes';
 import {
   LIST_BIBLE_VERSE_MAX_WORDS,
   LIST_REFLECTION_MAX_WORDS,
@@ -39,6 +40,8 @@ export default function TimelineScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [todaySunTimes, setTodaySunTimes] = useState<{ sunrise: string; sunset: string } | null>(null);
+  const [sunLineFallback, setSunLineFallback] = useState('Finding sunrise and sunset…');
 
   const load = useCallback(async () => {
     setError(null);
@@ -76,6 +79,39 @@ export default function TimelineScreen() {
     };
   }, [user]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (permission.status !== 'granted' || cancelled) {
+          if (!cancelled) setSunLineFallback('Enable location to show today’s sunrise and sunset.');
+          return;
+        }
+        const position = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (cancelled) return;
+        const times = getSunriseSunset(
+          new Date(),
+          position.coords.latitude,
+          position.coords.longitude,
+        );
+        if (!times || cancelled) return;
+        const tf = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' });
+        setTodaySunTimes({
+          sunrise: tf.format(times.sunrise),
+          sunset: tf.format(times.sunset),
+        });
+      } catch {
+        if (!cancelled) setSunLineFallback('Could not load sunrise and sunset right now.');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useLayoutEffect(() => {
     const avatarUri = mediaUrl(profile?.avatar);
     const avatarLabel = profile?.display_name || user?.username || '?';
@@ -110,6 +146,7 @@ export default function TimelineScreen() {
   return (
     <ScrollView
       style={styles.root}
+      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={[
         styles.content,
         { paddingBottom: Math.max(insets.bottom, 24) },
@@ -124,23 +161,25 @@ export default function TimelineScreen() {
           tintColor={theme.textSecondary}
         />
       }>
-      <View style={styles.hero}>
-        <RayLogo scale={1.15} />
-        <View style={styles.heroCopy}>
-          <Text style={styles.heroText}>Add a sunrise or sunset when you’re ready.</Text>
-          <Pressable
-            onPress={() => router.push('/moment/new')}
-            style={({ pressed }) => [styles.heroCta, pressed && { opacity: 0.92 }]}>
-            <Text style={styles.heroCtaText}>Write a moment</Text>
-          </Pressable>
-        </View>
+      <View style={styles.sunInline}>
+        {todaySunTimes ? (
+          <>
+            <View style={styles.sunInlineItem}>
+              <Ionicons name="sunny" size={16} color={theme.textPrimary} />
+              <Text style={styles.sunInlineText}>{todaySunTimes.sunrise}</Text>
+            </View>
+            <View style={styles.sunInlineItem}>
+              <Ionicons name="sunny-outline" size={16} color={theme.textPrimary} />
+              <Text style={styles.sunInlineText}>{todaySunTimes.sunset}</Text>
+            </View>
+          </>
+        ) : (
+          <View style={styles.sunInlineItem}>
+            <Ionicons name="location-outline" size={15} color={theme.textPrimary} />
+            <Text style={styles.sunInlineText}>{sunLineFallback}</Text>
+          </View>
+        )}
       </View>
-
-      {user ? (
-        <Text style={styles.signedIn}>
-          Signed in as <Text style={styles.signedInName}>{user.username}</Text>
-        </Text>
-      ) : null}
 
       {loading ? (
         <ActivityIndicator color={theme.textSecondary} style={{ marginTop: 16 }} />
@@ -266,50 +305,24 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: theme.textPrimary,
   },
-  hero: {
+  sunInline: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    alignItems: 'flex-start',
-    gap: 16,
-    marginBottom: 24,
-    padding: 18,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(244, 201, 93, 0.35)',
-    backgroundColor: 'rgba(243, 239, 231, 0.95)',
-  },
-  heroCopy: { flex: 1, minWidth: 200, gap: 12 },
-  heroText: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 16,
-    color: theme.textSecondary,
-    lineHeight: 22,
-  },
-  heroCta: {
-    alignSelf: 'flex-start',
-    minHeight: 44,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: theme.accentGolden,
+    gap: 10,
+    marginBottom: 16,
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
+    alignItems: 'center',
   },
-  heroCtaText: {
+  sunInlineItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  sunInlineText: {
     fontFamily: fonts.sansSemiBold,
-    fontSize: 15,
+    fontSize: 13,
     color: theme.textPrimary,
   },
-  signedIn: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 14,
-    color: theme.textSecondary,
-    marginBottom: 12,
-  },
-  signedInName: { color: theme.textPrimary, fontFamily: fonts.sansSemiBold },
   muted: {
     fontFamily: fonts.sansMedium,
     fontSize: 15,
