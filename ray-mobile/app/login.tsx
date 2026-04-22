@@ -122,6 +122,7 @@ const styles = StyleSheet.create({
   },
   brand: {
     alignItems: 'center',
+    marginTop: 28,
     marginBottom: 28,
   },
   form: { gap: 16, marginBottom: 20 },

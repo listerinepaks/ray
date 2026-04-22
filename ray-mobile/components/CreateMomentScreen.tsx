@@ -63,6 +63,9 @@ type CustomRow = {
   accessLevel: string;
 };
 
+const CREATE_STEPS = ['photos', 'kind', 'story', 'visibility'] as const;
+type CreateStep = (typeof CREATE_STEPS)[number];
+
 function todayDateString(): string {
   const d = new Date();
   const y = d.getFullYear();
@@ -93,12 +96,13 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
 
   const editId = routeEditId ?? null;
   const isEdit = editId != null;
+  const [createStep, setCreateStep] = useState<CreateStep>('photos');
 
   const [people, setPeople] = useState<Person[]>([]);
   const [shareUsers, setShareUsers] = useState<SharingUser[]>([]);
   const [loadingRefs, setLoadingRefs] = useState(true);
 
-  const [kind, setKind] = useState<'sunrise' | 'sunset'>('sunrise');
+  const [kind, setKind] = useState<'sunrise' | 'sunset' | 'other'>('sunrise');
   const [date, setDate] = useState(todayDateString);
   const [observedAt, setObservedAt] = useState('');
   const [title, setTitle] = useState('');
@@ -161,7 +165,7 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
           router.replace(`/moment/${editId}`);
           return;
         }
-        setKind(m.kind === 'sunset' ? 'sunset' : 'sunrise');
+        setKind(m.kind === 'sunset' ? 'sunset' : m.kind === 'other' ? 'other' : 'sunrise');
         setDate(m.date);
         setObservedAt(m.observed_at ? toDatetimeLocal(m.observed_at) : '');
         setTitle(m.title);
@@ -410,6 +414,25 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
     }
   }
 
+  const stepIndex = CREATE_STEPS.indexOf(createStep);
+  const isWizard = !isEdit;
+
+  function goToNextStep() {
+    setSubmitError(null);
+    if (createStep === 'photos' && photos.length === 0) {
+      setSubmitError('Add at least one photo to continue.');
+      return;
+    }
+    const next = CREATE_STEPS[stepIndex + 1];
+    if (next) setCreateStep(next);
+  }
+
+  function goToPreviousStep() {
+    setSubmitError(null);
+    const prev = CREATE_STEPS[stepIndex - 1];
+    if (prev) setCreateStep(prev);
+  }
+
   if (!currentUser) return null;
 
   return (
@@ -437,6 +460,25 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
             ) : null}
             {uploadPhase ? <Text style={styles.uploadPhase}>{uploadPhase}</Text> : null}
 
+            {isWizard ? (
+              <View style={styles.stepHeader}>
+                <Text style={styles.stepHeaderText}>
+                  Step {stepIndex + 1} of {CREATE_STEPS.length}
+                </Text>
+                <Text style={styles.stepHeaderTitle}>
+                  {createStep === 'photos'
+                    ? 'Add photos'
+                    : createStep === 'kind'
+                      ? 'Choose kind and time'
+                      : createStep === 'story'
+                        ? 'Add story details'
+                        : 'Choose who can see this'}
+                </Text>
+              </View>
+            ) : null}
+
+            {(!isWizard || createStep === 'kind') ? (
+              <>
             <Text style={styles.sectionTitle}>Kind & time</Text>
             <View style={styles.kindRow}>
               <Pressable
@@ -458,6 +500,16 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
                 <Text style={styles.kindEmoji}>🌙</Text>
                 <Text style={styles.kindLabel}>Sunset</Text>
                 <Text style={styles.kindHint}>Day closing</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setKind('other')}
+                style={[
+                  styles.kindCard,
+                  kind === 'other' && styles.kindCardSelected,
+                ]}>
+                <Text style={styles.kindEmoji}>✨</Text>
+                <Text style={styles.kindLabel}>Other</Text>
+                <Text style={styles.kindHint}>Any moment</Text>
               </Pressable>
             </View>
 
@@ -485,7 +537,11 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
                 autoCapitalize="none"
               />
             </View>
+              </>
+            ) : null}
 
+            {(!isWizard || createStep === 'story') ? (
+              <>
             <Text style={styles.sectionTitle}>Story</Text>
             <View style={styles.field}>
               <Text style={styles.label}>Title</Text>
@@ -534,7 +590,11 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
                 maxLength={200}
               />
             </View>
+              </>
+            ) : null}
 
+            {(!isWizard || createStep === 'visibility') ? (
+              <>
             <Text style={styles.sectionTitle}>Who can see this?</Text>
             <View style={styles.visCol}>
               <Pressable
@@ -644,7 +704,11 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
                 ))}
               </View>
             ) : null}
+              </>
+            ) : null}
 
+            {(!isWizard || createStep === 'photos') ? (
+              <>
             <Text style={styles.sectionTitle}>Photos</Text>
             <Pressable onPress={() => void addPhotos()} style={styles.addPhotoBtn}>
               <Text style={styles.addPhotoText}>Add photos</Text>
@@ -707,21 +771,56 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
                 </View>
               </View>
             ))}
+              </>
+            ) : null}
 
-            <Pressable
-              onPress={() => void onSubmit()}
-              disabled={submitting}
-              style={({ pressed }) => [
-                styles.submit,
-                submitting && styles.submitDisabled,
-                pressed && !submitting && { opacity: 0.94 },
-              ]}>
-              {submitting ? (
-                <ActivityIndicator color={theme.textPrimary} />
-              ) : (
-                <Text style={styles.submitText}>{isEdit ? 'Save changes' : 'Create moment'}</Text>
-              )}
-            </Pressable>
+            {isWizard ? (
+              <View style={styles.stepActions}>
+                {stepIndex > 0 ? (
+                  <Pressable onPress={goToPreviousStep} style={styles.stepBackBtn}>
+                    <Text style={styles.stepBackBtnText}>Back</Text>
+                  </Pressable>
+                ) : (
+                  <View />
+                )}
+                {createStep !== 'visibility' ? (
+                  <Pressable onPress={goToNextStep} style={styles.stepNextBtn}>
+                    <Text style={styles.stepNextBtnText}>Next</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    onPress={() => void onSubmit()}
+                    disabled={submitting}
+                    style={({ pressed }) => [
+                      styles.submit,
+                      styles.stepSubmitBtn,
+                      submitting && styles.submitDisabled,
+                      pressed && !submitting && { opacity: 0.94 },
+                    ]}>
+                    {submitting ? (
+                      <ActivityIndicator color={theme.textPrimary} />
+                    ) : (
+                      <Text style={styles.submitText}>Create moment</Text>
+                    )}
+                  </Pressable>
+                )}
+              </View>
+            ) : (
+              <Pressable
+                onPress={() => void onSubmit()}
+                disabled={submitting}
+                style={({ pressed }) => [
+                  styles.submit,
+                  submitting && styles.submitDisabled,
+                  pressed && !submitting && { opacity: 0.94 },
+                ]}>
+                {submitting ? (
+                  <ActivityIndicator color={theme.textPrimary} />
+                ) : (
+                  <Text style={styles.submitText}>{isEdit ? 'Save changes' : 'Create moment'}</Text>
+                )}
+              </Pressable>
+            )}
           </>
         )}
       </ScrollView>
@@ -807,6 +906,17 @@ const styles = StyleSheet.create({
   },
   bannerText: { fontFamily: fonts.sansRegular, fontSize: 14, color: theme.textPrimary },
   uploadPhase: { fontFamily: fonts.sansMedium, fontSize: 14, color: theme.textSecondary, marginBottom: 8 },
+  stepHeader: {
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: theme.bgSecondary,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    gap: 4,
+  },
+  stepHeaderText: { fontFamily: fonts.sansSemiBold, fontSize: 12, color: theme.textMuted },
+  stepHeaderTitle: { fontFamily: fonts.sansSemiBold, fontSize: 16, color: theme.textPrimary },
   sectionTitle: {
     marginTop: 8,
     marginBottom: 10,
@@ -955,6 +1065,33 @@ const styles = StyleSheet.create({
   },
   submitDisabled: { opacity: 0.65 },
   submitText: { fontFamily: fonts.sansSemiBold, fontSize: 17, color: theme.textPrimary },
+  stepActions: {
+    marginTop: 8,
+    marginBottom: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  stepBackBtn: {
+    minHeight: 48,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    backgroundColor: theme.cardBg,
+    justifyContent: 'center',
+  },
+  stepBackBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: theme.textSecondary },
+  stepNextBtn: {
+    minHeight: 48,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    backgroundColor: theme.accentGolden,
+    justifyContent: 'center',
+  },
+  stepNextBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: theme.textPrimary },
+  stepSubmitBtn: { marginTop: 0, marginBottom: 0, minWidth: 168 },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',

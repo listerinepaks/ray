@@ -17,7 +17,8 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Ray uses your location to show today's sunrise and sunset times."
-      }
+      },
+      "bundleIdentifier": "com.listerinepaks.ray-mobile"
     },
     "android": {
       "adaptiveIcon": {
@@ -25,7 +26,11 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",

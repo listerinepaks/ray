@@ -74,7 +74,7 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
   const [shareUsers, setShareUsers] = useState<SharingUser[]>([])
   const [loadingRefs, setLoadingRefs] = useState(true)
 
-  const [kind, setKind] = useState<'sunrise' | 'sunset'>('sunrise')
+  const [kind, setKind] = useState<'sunrise' | 'sunset' | 'other'>('sunrise')
   const [date, setDate] = useState(todayDateString)
   const [observedAt, setObservedAt] = useState('')
   const [title, setTitle] = useState('')
@@ -135,7 +135,7 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
           navigate(`/moments/${editId}`, { replace: true })
           return
         }
-        setKind(m.kind === 'sunset' ? 'sunset' : 'sunrise')
+        setKind(m.kind === 'sunset' ? 'sunset' : m.kind === 'other' ? 'other' : 'sunrise')
         setDate(m.date)
         setObservedAt(m.observed_at ? toDatetimeLocal(m.observed_at) : '')
         setTitle(m.title)
@@ -396,7 +396,7 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
           <p className="create-lead">
             {isEdit
               ? 'Update the story, who can see it, and photos.'
-              : 'Capture a sunrise or sunset — who was there, what you felt, and who can see it.'}
+              : 'Capture a sunrise, sunset, or other moment — who was there, what you felt, and who can see it.'}
           </p>
         </div>
       </header>
@@ -536,7 +536,7 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
             <h2 id="sec-kind" className="create-section-title">
               Kind &amp; time
             </h2>
-            <div className="kind-grid" role="group" aria-label="Sunrise or sunset">
+            <div className="kind-grid" role="group" aria-label="Moment kind">
               <button
                 type="button"
                 className={`kind-option ${kind === 'sunrise' ? 'is-selected' : ''}`}
@@ -558,6 +558,17 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
                 </span>
                 <span className="kind-option-label">Sunset</span>
                 <span className="kind-option-hint">Day closing</span>
+              </button>
+              <button
+                type="button"
+                className={`kind-option ${kind === 'other' ? 'is-selected' : ''}`}
+                onClick={() => setKind('other')}
+              >
+                <span className="kind-option-icon" aria-hidden>
+                  ✨
+                </span>
+                <span className="kind-option-label">Other</span>
+                <span className="kind-option-hint">Any moment</span>
               </button>
             </div>
 

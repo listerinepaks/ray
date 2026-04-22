@@ -36,9 +36,11 @@ class Person(models.Model):
 class Moment(models.Model):
     KIND_SUNRISE = "sunrise"
     KIND_SUNSET = "sunset"
+    KIND_OTHER = "other"
     KIND_CHOICES = [
         (KIND_SUNRISE, "Sunrise"),
         (KIND_SUNSET, "Sunset"),
+        (KIND_OTHER, "Other"),
     ]
 
     VISIBILITY_PRIVATE = "private"
