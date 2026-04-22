@@ -165,17 +165,17 @@ export default function TimelineScreen() {
         {todaySunTimes ? (
           <>
             <View style={styles.sunInlineItem}>
-              <Ionicons name="sunny" size={16} color={theme.textPrimary} />
+              <Ionicons name="sunny" size={16} color={theme.accentDusk} />
               <Text style={styles.sunInlineText}>{todaySunTimes.sunrise}</Text>
             </View>
             <View style={styles.sunInlineItem}>
-              <Ionicons name="sunny-outline" size={16} color={theme.textPrimary} />
+              <Ionicons name="sunny-outline" size={16} color={theme.accentDusk} />
               <Text style={styles.sunInlineText}>{todaySunTimes.sunset}</Text>
             </View>
           </>
         ) : (
           <View style={styles.sunInlineItem}>
-            <Ionicons name="location-outline" size={15} color={theme.textPrimary} />
+            <Ionicons name="location-outline" size={15} color={theme.accentDusk} />
             <Text style={styles.sunInlineText}>{sunLineFallback}</Text>
           </View>
         )}
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
   sunInlineText: {
     fontFamily: fonts.sansSemiBold,
     fontSize: 13,
-    color: theme.textPrimary,
+    color: theme.accentDusk,
   },
   muted: {
     fontFamily: fonts.sansMedium,
