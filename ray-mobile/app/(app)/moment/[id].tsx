@@ -190,9 +190,13 @@ export default function MomentEntryScreen() {
             <Text style={styles.sectionLabel}>People</Text>
             <View style={styles.chips}>
               {moment.tagged_people.map((p) => (
-                <View key={p.id} style={styles.chip}>
+                <Pressable
+                  key={p.id}
+                  style={styles.chip}
+                  onPress={() => router.push(`/profile/${p.id}`)}
+                >
                   <Text style={styles.chipText}>{p.name}</Text>
-                </View>
+                </Pressable>
               ))}
             </View>
           </View>

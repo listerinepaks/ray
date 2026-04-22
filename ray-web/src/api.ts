@@ -160,6 +160,16 @@ export async function updateProfile(payload: {
   return res.json() as Promise<Profile>
 }
 
+export async function fetchProfileByPerson(personId: number): Promise<Profile> {
+  const base = getApiBase()
+  const res = await fetch(`${base}/api/profile/people/${personId}/`, {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await parseErrorBody(res))
+  return res.json() as Promise<Profile>
+}
+
 export type MomentPhoto = {
   id: number
   image: string

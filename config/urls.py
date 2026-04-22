@@ -11,6 +11,7 @@ from moments.views import (
     MomentViewSet,
     PersonViewSet,
     ProfileMeView,
+    ProfilePersonView,
     ReactionViewSet,
 )
 
@@ -28,6 +29,7 @@ urlpatterns = [
     path("api/auth/me/", auth_views.AuthMeView.as_view()),
     path("api/auth/users/", auth_views.AuthUsersView.as_view()),
     path("api/profile/me/", ProfileMeView.as_view()),
+    path("api/profile/people/<int:person_id>/", ProfilePersonView.as_view()),
     path("api/auth/token/", auth_views.auth_token_obtain),
     path("api/auth/token/revoke/", auth_views.auth_token_revoke),
     path("api/", include(router.urls)),

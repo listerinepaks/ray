@@ -21,6 +21,7 @@ from .serializers import (
     MomentPhotoSerializer,
     MomentSerializer,
     PersonSerializer,
+    PersonProfileSerializer,
     ProfileSerializer,
     ReactionSerializer,
 )
@@ -117,6 +118,25 @@ class ProfileMeView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        return Response(serializer.data)
+
+
+class ProfilePersonView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, person_id: int):
+        person = (
+            Person.objects.filter(
+                id=person_id,
+                moments__moment__access_list__user=request.user,
+            )
+            .select_related("linked_user")
+            .distinct()
+            .first()
+        )
+        if person is None:
+            raise Http404
+        serializer = PersonProfileSerializer(person, context={"request": request})
         return Response(serializer.data)
 
 

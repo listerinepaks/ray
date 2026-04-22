@@ -15,6 +15,7 @@ import {
 import { RayLogo } from './components/RayLogo'
 import { CreateMoment } from './pages/CreateMoment'
 import { EntryView } from './pages/EntryView'
+import { PersonProfile } from './pages/PersonProfile'
 import { Profile } from './pages/Profile'
 import { Timeline } from './pages/Timeline'
 import './App.css'
@@ -263,6 +264,7 @@ function App() {
           }
         />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/people/:id" element={<PersonProfile />} />
         <Route path="/moments/new" element={<CreateMoment currentUser={user} />} />
         <Route path="/moments/:id/edit" element={<CreateMoment currentUser={user} />} />
         <Route path="/moments/:id" element={<EntryView />} />

@@ -61,6 +61,48 @@ class ProfileSerializer(serializers.ModelSerializer):
         return obj.linked_user.moment_access.exclude(moment__author=obj.linked_user).count()
 
 
+class PersonProfileSerializer(serializers.ModelSerializer):
+    person_id = serializers.IntegerField(source="id", read_only=True)
+    username = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+    display_name = serializers.CharField(source="name", read_only=True)
+    bio = serializers.CharField(source="note", read_only=True)
+    avatar = serializers.ImageField(source="profile_photo", read_only=True)
+    moments_authored = serializers.SerializerMethodField()
+    moments_shared_with_me = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Person
+        fields = [
+            "person_id",
+            "username",
+            "email",
+            "display_name",
+            "bio",
+            "avatar",
+            "moments_authored",
+            "moments_shared_with_me",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_username(self, obj):
+        return obj.linked_user.username if obj.linked_user_id else None
+
+    def get_email(self, obj):
+        return obj.linked_user.email if obj.linked_user_id else None
+
+    def get_moments_authored(self, obj):
+        if obj.linked_user_id is None:
+            return 0
+        return obj.linked_user.moments_authored.count()
+
+    def get_moments_shared_with_me(self, obj):
+        if obj.linked_user_id is None:
+            return 0
+        return obj.linked_user.moment_access.exclude(moment__author=obj.linked_user).count()
+
+
 class MomentPhotoSerializer(serializers.ModelSerializer):
     class Meta:
         model = MomentPhoto

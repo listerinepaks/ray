@@ -161,7 +161,9 @@ export function EntryView() {
             <h2 className="entry-section-label">With</h2>
             <ul className="people-chips">
               {moment.tagged_people.map((p) => (
-                <li key={p.id}>{p.name}</li>
+                <li key={p.id}>
+                  <Link to={`/people/${p.id}`}>{p.name}</Link>
+                </li>
               ))}
             </ul>
           </section>
