@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 2,
   },
   headerAvatarButton: {
     width: 38,
