@@ -80,3 +80,31 @@ class FriendshipAndAccessTests(APITestCase):
         after_remove = self.client.get("/api/moments/")
         self.assertEqual(after_remove.status_code, status.HTTP_200_OK)
         self.assertEqual(len(after_remove.data), 0)
+
+    def test_friend_accept_backfills_friends_moments_created_before_friendship(self):
+        """Friends visibility is enforced via MomentAccess; accepting friendship must resync."""
+        self.client.force_authenticate(self.author)
+        friends_moment = Moment.objects.create(
+            author=self.author,
+            kind=Moment.KIND_SUNRISE,
+            date="2026-04-22",
+            visibility_mode=Moment.VISIBILITY_FRIENDS,
+            title="Already friends-only",
+        )
+        sync_moment_access(friends_moment)
+
+        self.client.force_authenticate(self.wife)
+        self.assertEqual(len(self.client.get("/api/moments/").data), 0)
+
+        self.client.force_authenticate(self.author)
+        self.client.post("/api/friends/requests/", {"user_id": self.wife.id}, format="json")
+        self.client.force_authenticate(self.wife)
+        listing = self.client.get("/api/friends/")
+        friendship_id = listing.data["pending_incoming"][0]["id"]
+        accept = self.client.post(f"/api/friends/requests/{friendship_id}/accept/", format="json")
+        self.assertEqual(accept.status_code, status.HTTP_200_OK)
+
+        self.client.force_authenticate(self.wife)
+        after = self.client.get("/api/moments/")
+        self.assertEqual(after.status_code, status.HTTP_200_OK)
+        self.assertEqual([m["id"] for m in after.data], [friends_moment.id])

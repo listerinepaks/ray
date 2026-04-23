@@ -175,7 +175,8 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
   const [bibleVerse, setBibleVerse] = useState('');
   const [reflection, setReflection] = useState('');
   const [locationName, setLocationName] = useState('');
-  const [visibility, setVisibility] = useState<string>(VIS.tagged);
+  /** Default `friends`: accepted friends get access (see `sync_moment_access`). `tagged` does not include friends. */
+  const [visibility, setVisibility] = useState<string>(VIS.friends);
   const [selectedPeople, setSelectedPeople] = useState<Set<number>>(new Set());
   const [customRows, setCustomRows] = useState<CustomRow[]>([]);
 
@@ -440,7 +441,9 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
     setSubmitError(null);
 
     if (visibility === VIS.tagged && selectedPeople.size === 0) {
-      setSubmitError('Choose at least one person to tag, or switch to Private visibility.');
+      setSubmitError(
+        'Choose at least one person to tag, or switch to Friends or Private visibility.',
+      );
       return;
     }
     if (visibility === VIS.custom) {

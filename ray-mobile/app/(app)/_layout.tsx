@@ -36,7 +36,7 @@ export default function AppGroupLayout() {
           contentStyle: { backgroundColor: theme.bgPrimary },
           headerShadowVisible: false,
         }}>
-        <Stack.Screen name="index" options={{ title: 'Ray', headerLargeTitle: true }} />
+        <Stack.Screen name="index" options={{ title: 'Ray' }} />
         <Stack.Screen name="profile" options={{ title: 'Profile' }} />
         <Stack.Screen name="friends" options={{ title: 'Friends' }} />
         <Stack.Screen name="profile/[id]" options={{ title: 'Profile' }} />

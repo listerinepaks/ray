@@ -26,6 +26,7 @@ const VIS = {
   private: 'private',
   tagged: 'tagged',
   custom: 'custom',
+  friends: 'friends',
 } as const
 
 const ACCESS_LEVELS = [
@@ -82,7 +83,8 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
   const [bibleVerse, setBibleVerse] = useState('')
   const [reflection, setReflection] = useState('')
   const [locationName, setLocationName] = useState('')
-  const [visibility, setVisibility] = useState<string>(VIS.tagged)
+  /** Default `friends`: accepted friends get access. `tagged` does not include friends. */
+  const [visibility, setVisibility] = useState<string>(VIS.friends)
   const [selectedPeople, setSelectedPeople] = useState<Set<number>>(new Set())
   const [customRows, setCustomRows] = useState<CustomRow[]>([])
 
@@ -341,7 +343,9 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
     setSubmitError(null)
 
     if (visibility === VIS.tagged && selectedPeople.size === 0) {
-      setSubmitError('Choose at least one person to tag, or switch to Private visibility.')
+      setSubmitError(
+        'Choose at least one person to tag, or switch to Friends or Private visibility.',
+      )
       return
     }
     if (visibility === VIS.custom) {
@@ -671,6 +675,16 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
               >
                 <span className="visibility-card-title">Private</span>
                 <span className="visibility-card-body">Only you. Nothing is shared.</span>
+              </button>
+              <button
+                type="button"
+                className={`visibility-card ${visibility === VIS.friends ? 'is-selected' : ''}`}
+                onClick={() => setVisibilityMode(VIS.friends)}
+              >
+                <span className="visibility-card-title">Friends</span>
+                <span className="visibility-card-body">
+                  Everyone you are friends with on Ray can view and comment.
+                </span>
               </button>
               <button
                 type="button"
