@@ -58,6 +58,8 @@ export type Me = {
   id: number;
   username: string;
   email: string;
+  /** Django auth `Group.name` values (e.g. `love`). */
+  groups?: string[];
 };
 
 export type Profile = {
@@ -246,14 +248,18 @@ export async function createPerson(payload: { name: string; note?: string }): Pr
 export type SharingUser = {
   id: number;
   username: string;
+  /** Relative media path when the user has a linked Person with a profile photo */
+  avatar?: string | null;
 };
 
 export type Friendship = {
   id: number;
   requester_id: number;
   requester_username: string;
+  requester_avatar?: string | null;
   addressee_id: number;
   addressee_username: string;
+  addressee_avatar?: string | null;
   status: 'pending' | 'accepted';
   direction: 'incoming' | 'outgoing';
   created_at: string;

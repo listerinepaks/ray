@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,14 +18,19 @@ import { RayLogo } from '@/components/RayLogo';
 import { useAuth } from '@/contexts/AuthContext';
 import { fonts, theme } from '@/constants/theme';
 
+/** Matches `RayLogo` default base height × scale */
+const LOGIN_LOGO_SCALE = 1.1;
+
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const router = useRouter();
   const { user, login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (user) router.replace('/');
@@ -45,6 +51,17 @@ export default function LoginScreen() {
     }
   }
 
+  const canSubmit = !busy && Boolean(username.trim() && password);
+
+  const scrollPadTop = Math.max(insets.top, 16);
+  /** Push the wordmark clearly below the status bar; scales on taller phones */
+  const brandMarginTop = Math.round(
+    Math.min(140, Math.max(72, windowHeight * 0.11 + 36)),
+  );
+  const brandMarginBottom = 28;
+  /** Fixed breathing room under the logo (avoid half-screen math that stranded the form). */
+  const formMarginTop = 36;
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: theme.bgPrimary }}
@@ -53,41 +70,51 @@ export default function LoginScreen() {
         contentContainerStyle={[
           styles.scroll,
           {
-            paddingTop: Math.max(insets.top, 24),
+            flexGrow: 1,
+            minHeight: windowHeight,
+            paddingTop: scrollPadTop,
             paddingBottom: Math.max(insets.bottom, 24),
           },
         ]}
         keyboardShouldPersistTaps="handled">
-        <View style={styles.brand}>
-          <RayLogo scale={1.1} />
+        <View
+          style={[
+            styles.brand,
+            { marginTop: brandMarginTop, marginBottom: brandMarginBottom },
+          ]}>
+          <RayLogo scale={LOGIN_LOGO_SCALE} />
         </View>
 
-        <View style={styles.form}>
-          <View style={styles.field}>
-            <Text style={styles.label}>Username</Text>
-            <TextInput
-              value={username}
-              onChangeText={setUsername}
-              autoCapitalize="none"
-              autoCorrect={false}
-              textContentType="username"
-              style={styles.input}
-              placeholderTextColor={theme.textMuted}
-              placeholder="Username"
-            />
-          </View>
-          <View style={styles.field}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              textContentType="password"
-              style={styles.input}
-              placeholderTextColor={theme.textMuted}
-              placeholder="Password"
-            />
-          </View>
+        <View style={[styles.form, { marginTop: formMarginTop }]}>
+          <TextInput
+            value={username}
+            onChangeText={setUsername}
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="username"
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => passwordRef.current?.focus()}
+            accessibilityLabel="Username"
+            style={styles.input}
+            placeholderTextColor={theme.textMuted}
+            placeholder="Username"
+          />
+          <TextInput
+            ref={passwordRef}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            textContentType="password"
+            returnKeyType="go"
+            onSubmitEditing={() => {
+              if (canSubmit) void onSubmit();
+            }}
+            accessibilityLabel="Password"
+            style={styles.input}
+            placeholderTextColor={theme.textMuted}
+            placeholder="Password"
+          />
           {error ? (
             <Text style={styles.error} accessibilityRole="alert">
               {error}
@@ -95,11 +122,11 @@ export default function LoginScreen() {
           ) : null}
           <Pressable
             onPress={() => void onSubmit()}
-            disabled={busy || !username.trim() || !password}
+            disabled={!canSubmit}
             style={({ pressed }) => [
               styles.primaryBtn,
-              (busy || !username.trim() || !password) && styles.primaryBtnDisabled,
-              pressed && !(busy || !username.trim() || !password) && { opacity: 0.92 },
+              !canSubmit && styles.primaryBtnDisabled,
+              pressed && canSubmit && { opacity: 0.92 },
             ]}>
             {busy ? (
               <ActivityIndicator color={theme.textPrimary} />
@@ -122,16 +149,8 @@ const styles = StyleSheet.create({
   },
   brand: {
     alignItems: 'center',
-    marginTop: 28,
-    marginBottom: 28,
   },
   form: { gap: 16, marginBottom: 20 },
-  field: { gap: 6 },
-  label: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 14,
-    color: theme.textSecondary,
-  },
   input: {
     minHeight: 48,
     paddingHorizontal: 12,

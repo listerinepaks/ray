@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +18,7 @@ import {
   acceptFriendRequest,
   fetchFriendships,
   fetchSharingUsers,
+  mediaUrl,
   removeFriend,
   sendFriendRequest,
   type Friendship,
@@ -30,6 +32,27 @@ function otherUserId(row: Friendship, meId: number): number {
 
 function otherUsername(row: Friendship, meId: number): string {
   return row.requester_id === meId ? row.addressee_username : row.requester_username;
+}
+
+function AvatarChip({
+  uri,
+  label,
+}: {
+  uri: string;
+  label: string;
+}) {
+  const letter = label.slice(0, 1).toUpperCase();
+  return (
+    <View style={styles.avatarWrap}>
+      {uri ? (
+        <Image source={{ uri }} style={styles.avatarImg} />
+      ) : (
+        <View style={[styles.avatarImg, styles.avatarFallback]}>
+          <Text style={styles.avatarLetter}>{letter}</Text>
+        </View>
+      )}
+    </View>
+  );
 }
 
 export default function FriendsScreen() {
@@ -70,6 +93,14 @@ export default function FriendsScreen() {
   }, [load]);
 
   const q = search.trim().toLowerCase();
+
+  const avatarByUserId = useMemo(() => {
+    const m = new Map<number, string | null | undefined>();
+    for (const u of sharingUsers) {
+      m.set(u.id, u.avatar);
+    }
+    return m;
+  }, [sharingUsers]);
 
   const acceptedFriendUserIds = useMemo(
     () =>
@@ -176,6 +207,11 @@ export default function FriendsScreen() {
     }
   }
 
+  function rowAvatar(userId: number, username: string, relFromApi?: string | null) {
+    const rel = relFromApi ?? avatarByUserId.get(userId);
+    return <AvatarChip uri={mediaUrl(rel)} label={username} />;
+  }
+
   return (
     <ScrollView
       style={styles.root}
@@ -190,7 +226,6 @@ export default function FriendsScreen() {
       </Pressable>
 
       <Text style={styles.title}>Friends</Text>
-      <Text style={styles.subtitle}>Search people on this Ray server, manage requests, and your list.</Text>
 
       <View style={styles.field}>
         <Text style={styles.label}>Search</Text>
@@ -218,6 +253,7 @@ export default function FriendsScreen() {
           <Text style={styles.sectionTitle}>Requests</Text>
           {filteredIncoming.map((f) => (
             <View key={f.id} style={styles.row}>
+              {rowAvatar(f.requester_id, f.requester_username, f.requester_avatar)}
               <Text style={styles.rowName}>{f.requester_username}</Text>
               <Pressable disabled={busy} onPress={() => void onAccept(f.id)} style={styles.secondaryBtn}>
                 <Text style={styles.secondaryBtnText}>Accept</Text>
@@ -232,6 +268,7 @@ export default function FriendsScreen() {
           <Text style={styles.sectionTitle}>Pending</Text>
           {filteredOutgoing.map((f) => (
             <View key={f.id} style={styles.row}>
+              {rowAvatar(f.addressee_id, f.addressee_username, f.addressee_avatar)}
               <Text style={styles.rowName}>{f.addressee_username}</Text>
               <Pressable
                 disabled={busy}
@@ -252,8 +289,10 @@ export default function FriendsScreen() {
           filteredAccepted.map((f) => {
             const oid = otherUserId(f, meId);
             const name = otherUsername(f, meId);
+            const rel = oid === f.requester_id ? f.requester_avatar : f.addressee_avatar;
             return (
               <View key={f.id} style={styles.row}>
+                {rowAvatar(oid, name, rel)}
                 <Text style={styles.rowName}>{name}</Text>
                 <Pressable disabled={busy} onPress={() => void onRemoveOrCancel(oid)} style={styles.secondaryBtn}>
                   <Text style={styles.secondaryBtnText}>Remove</Text>
@@ -266,14 +305,12 @@ export default function FriendsScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Add friend</Text>
-        {q === '' ? (
-          <Text style={styles.muted}>Type a username to search, or browse everyone below.</Text>
-        ) : null}
         {friendCandidates.length === 0 ? (
           <Text style={styles.muted}>{q ? 'No users match that search.' : 'No users available to add.'}</Text>
         ) : (
           friendCandidates.map((u) => (
             <View key={u.id} style={styles.row}>
+              {rowAvatar(u.id, u.username)}
               <Text style={styles.rowName}>{u.username}</Text>
               <Pressable disabled={busy} onPress={() => void onSend(u.id)} style={styles.secondaryBtn}>
                 <Text style={styles.secondaryBtnText}>Request</Text>
@@ -290,14 +327,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.bgPrimary },
   backRow: { alignSelf: 'flex-start', marginBottom: 8 },
   backText: { fontFamily: fonts.sansSemiBold, fontSize: 16, color: theme.textSecondary },
-  title: { fontFamily: fonts.serifSemi, fontSize: 26, color: theme.textPrimary, marginBottom: 6 },
-  subtitle: {
-    fontFamily: fonts.sansRegular,
-    fontSize: 15,
-    lineHeight: 22,
-    color: theme.textSecondary,
-    marginBottom: 16,
-  },
+  title: { fontFamily: fonts.serifSemi, fontSize: 26, color: theme.textPrimary, marginBottom: 14 },
   field: { gap: 6, marginBottom: 16 },
   label: { fontFamily: fonts.sansMedium, fontSize: 14, color: theme.textSecondary },
   input: {
@@ -336,6 +366,16 @@ const styles = StyleSheet.create({
     backgroundColor: theme.cardBg,
   },
   rowName: { flex: 1, fontFamily: fonts.sansMedium, fontSize: 15, color: theme.textPrimary },
+  avatarWrap: { marginRight: 2 },
+  avatarImg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.bgSecondary,
+    overflow: 'hidden',
+  },
+  avatarFallback: { alignItems: 'center', justifyContent: 'center' },
+  avatarLetter: { fontFamily: fonts.sansSemiBold, fontSize: 16, color: theme.textSecondary },
   muted: { fontFamily: fonts.sansRegular, fontSize: 14, color: theme.textMuted },
   secondaryBtn: {
     paddingHorizontal: 14,

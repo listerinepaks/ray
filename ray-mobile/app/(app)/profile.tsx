@@ -194,7 +194,7 @@ export default function ProfileScreen() {
 
           {profile.person_id != null ? (
             <Pressable onPress={() => router.push('/friends')} style={styles.friendsLink}>
-              <Text style={styles.friendsLinkText}>Friends — search and manage</Text>
+              <Text style={styles.friendsLinkText}>Friends</Text>
             </Pressable>
           ) : null}
 
@@ -397,8 +397,16 @@ const styles = StyleSheet.create({
   primaryBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 16, color: theme.textPrimary },
   saved: { fontFamily: fonts.sansRegular, fontSize: 14, color: theme.textSecondary },
   signOutBtn: {
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
+    alignSelf: 'stretch',
+    marginTop: 22,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  signOutText: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: theme.error },
+  signOutText: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 15,
+    color: theme.error,
+    textAlign: 'center',
+  },
 });

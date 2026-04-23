@@ -25,10 +25,12 @@ import {
   truncateWords,
 } from '@/lib/truncateWords';
 import {
+  acceptFriendRequest,
   fetchFriendships,
   fetchMoments,
   fetchProfile,
   mediaUrl,
+  type Friendship,
   type Moment,
   type Profile,
 } from '@/lib/api';
@@ -53,12 +55,17 @@ export default function TimelineScreen() {
   const [sunLineFallback, setSunLineFallback] = useState('Finding sunrise and sunset…');
   const [feedTab, setFeedTab] = useState<FeedTab>('all');
   const [friendUserIds, setFriendUserIds] = useState<Set<number>>(new Set());
+  const [pendingIncoming, setPendingIncoming] = useState<Friendship[]>([]);
+  const [friendRequestBusyId, setFriendRequestBusyId] = useState<number | null>(null);
+  const [friendRequestError, setFriendRequestError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
+    setFriendRequestError(null);
     try {
       const [list, friendships] = await Promise.all([fetchMoments(), fetchFriendships()]);
       setMoments(list);
+      setPendingIncoming(friendships.pending_incoming ?? []);
       const accepted = new Set<number>();
       for (const row of friendships.accepted) {
         accepted.add(row.requester_id === user?.id ? row.addressee_id : row.requester_id);
@@ -71,6 +78,22 @@ export default function TimelineScreen() {
       setRefreshing(false);
     }
   }, [user?.id]);
+
+  const onAcceptFriendRequest = useCallback(
+    async (friendshipId: number) => {
+      setFriendRequestError(null);
+      setFriendRequestBusyId(friendshipId);
+      try {
+        await acceptFriendRequest(friendshipId);
+        await load();
+      } catch (e) {
+        setFriendRequestError(e instanceof Error ? e.message : 'Could not accept request.');
+      } finally {
+        setFriendRequestBusyId(null);
+      }
+    },
+    [load],
+  );
 
   useEffect(() => {
     void load();
@@ -212,6 +235,63 @@ export default function TimelineScreen() {
         )}
         </View>
 
+      {pendingIncoming.length > 0 ? (
+        <View style={styles.friendReqCard}>
+          <View style={styles.friendReqHead}>
+            <Text style={styles.friendReqTitle}>Friend requests</Text>
+            <Pressable onPress={() => router.push('/friends')} hitSlop={8}>
+              <Text style={styles.friendReqManage}>Manage</Text>
+            </Pressable>
+          </View>
+          {pendingIncoming.slice(0, 3).map((row) => {
+            const avatarUri = mediaUrl(row.requester_avatar);
+            const busy = friendRequestBusyId === row.id;
+            return (
+              <View key={row.id} style={styles.friendReqRow}>
+                {avatarUri ? (
+                  <Image source={{ uri: avatarUri }} style={styles.friendReqAvatar} />
+                ) : (
+                  <View style={styles.friendReqAvatarFallback}>
+                    <Text style={styles.friendReqAvatarLetter}>
+                      {row.requester_username.slice(0, 1).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                <Text style={styles.friendReqName} numberOfLines={1}>
+                  {row.requester_username}
+                </Text>
+                <Pressable
+                  onPress={() => void onAcceptFriendRequest(row.id)}
+                  disabled={busy || friendRequestBusyId != null}
+                  style={({ pressed }) => [
+                    styles.friendReqAccept,
+                    (busy || friendRequestBusyId != null) && styles.friendReqAcceptDisabled,
+                    pressed && !busy && friendRequestBusyId == null && { opacity: 0.92 },
+                  ]}>
+                  {busy ? (
+                    <ActivityIndicator color={theme.textPrimary} size="small" />
+                  ) : (
+                    <Text style={styles.friendReqAcceptText}>Accept</Text>
+                  )}
+                </Pressable>
+              </View>
+            );
+          })}
+          {pendingIncoming.length > 3 ? (
+            <Pressable onPress={() => router.push('/friends')} style={styles.friendReqMore}>
+              <Text style={styles.friendReqMoreText}>
+                +{pendingIncoming.length - 3} more — open Friends
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+      {friendRequestError ? (
+        <View style={styles.friendReqErr} accessibilityRole="alert">
+          <Text style={styles.friendReqErrText}>{friendRequestError}</Text>
+        </View>
+      ) : null}
+
       {loading ? (
         <ActivityIndicator color={theme.textSecondary} style={{ marginTop: 16 }} />
       ) : null}
@@ -310,9 +390,18 @@ export default function TimelineScreen() {
         <Pressable
           onPress={() => setFeedTab('friends')}
           style={[styles.feedTabBtn, feedTab === 'friends' && styles.feedTabBtnOn]}>
-          <Text style={[styles.feedTabText, feedTab === 'friends' && styles.feedTabTextOn]}>
-            Friends
-          </Text>
+          <View style={styles.feedTabInner}>
+            <Text style={[styles.feedTabText, feedTab === 'friends' && styles.feedTabTextOn]}>
+              Friends
+            </Text>
+            {pendingIncoming.length > 0 ? (
+              <View style={styles.feedTabBadge} accessibilityLabel={`${pendingIncoming.length} pending friend requests`}>
+                <Text style={styles.feedTabBadgeText}>
+                  {pendingIncoming.length > 9 ? '9+' : String(pendingIncoming.length)}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </Pressable>
         <Pressable
           onPress={() => setFeedTab('mentions')}
@@ -534,10 +623,119 @@ const styles = StyleSheet.create({
     backgroundColor: theme.bgSecondary,
   },
   feedTabBtnOn: { backgroundColor: theme.pillBg },
+  feedTabInner: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  feedTabBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -14,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    borderRadius: 9,
+    backgroundColor: theme.accentDusk,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  feedTabBadgeText: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 11,
+    color: '#fff',
+  },
   feedTabText: {
     fontFamily: fonts.sansSemiBold,
     fontSize: 13,
     color: theme.textSecondary,
   },
   feedTabTextOn: { color: theme.textPrimary },
+  friendReqCard: {
+    marginBottom: 16,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: theme.cardBg,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    gap: 10,
+  },
+  friendReqHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  friendReqTitle: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 15,
+    color: theme.textPrimary,
+  },
+  friendReqManage: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 14,
+    color: theme.accentDusk,
+  },
+  friendReqRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  friendReqAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.bgSecondary,
+  },
+  friendReqAvatarFallback: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.bgSecondary,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  friendReqAvatarLetter: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 15,
+    color: theme.textPrimary,
+  },
+  friendReqName: {
+    flex: 1,
+    fontFamily: fonts.sansMedium,
+    fontSize: 15,
+    color: theme.textPrimary,
+  },
+  friendReqAccept: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: theme.pillBg,
+    minWidth: 84,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  friendReqAcceptDisabled: { opacity: 0.55 },
+  friendReqAcceptText: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 13,
+    color: theme.textPrimary,
+  },
+  friendReqMore: { paddingVertical: 2 },
+  friendReqMoreText: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 13,
+    color: theme.textMuted,
+  },
+  friendReqErr: {
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: theme.bannerBg,
+    borderWidth: 1,
+    borderColor: theme.bannerBorder,
+  },
+  friendReqErrText: {
+    fontFamily: fonts.sansRegular,
+    fontSize: 14,
+    color: theme.textSecondary,
+  },
 });

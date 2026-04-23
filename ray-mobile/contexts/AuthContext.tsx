@@ -51,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       id: res.id,
       username: res.username,
       email: res.email,
+      groups: res.groups ?? [],
     });
   }, []);
 

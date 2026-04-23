@@ -12,6 +12,13 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from moments.models import Person
+
+
+def _user_group_names(user) -> list[str]:
+    """Django auth `Group.name` values (e.g. ``love``) for client UX flags."""
+    return list(user.groups.order_by("name").values_list("name", flat=True))
+
 
 @require_GET
 @ensure_csrf_cookie
@@ -39,6 +46,7 @@ def auth_login(request):
             "id": user.id,
             "username": user.username,
             "email": user.email,
+            "groups": _user_group_names(user),
         }
     )
 
@@ -62,6 +70,7 @@ class AuthMeView(APIView):
                 "id": u.id,
                 "username": u.username,
                 "email": u.email,
+                "groups": _user_group_names(u),
             }
         )
 
@@ -74,9 +83,20 @@ class AuthUsersView(APIView):
 
     def get(self, request):
         User = get_user_model()
+        active_users = list(User.objects.filter(is_active=True).order_by("username")[:500])
+        user_ids = [u.id for u in active_users]
+        avatar_by_user_id = {
+            row.linked_user_id: row.profile_photo.name
+            for row in Person.objects.filter(linked_user_id__in=user_ids).only("linked_user_id", "profile_photo")
+            if row.profile_photo
+        }
         users = [
-            {"id": u.id, "username": u.username}
-            for u in User.objects.filter(is_active=True).order_by("username")[:500]
+            {
+                "id": u.id,
+                "username": u.username,
+                "avatar": avatar_by_user_id.get(u.id),
+            }
+            for u in active_users
         ]
         return Response({"users": users})
 
@@ -105,6 +125,7 @@ def auth_token_obtain(request):
             "id": user.id,
             "username": user.username,
             "email": user.email,
+            "groups": _user_group_names(user),
         }
     )
 

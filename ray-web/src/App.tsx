@@ -270,6 +270,12 @@ function App() {
         <Route path="/moments/:id" element={<EntryView />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
+      {user.groups?.includes('love') ? (
+        <div className="floating-love-heart" aria-hidden>
+          ♥
+        </div>
+      ) : null}
     </div>
   )
 }

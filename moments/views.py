@@ -252,7 +252,20 @@ class FriendshipListView(APIView):
             Friendship.objects.filter(requester=request.user)
             | Friendship.objects.filter(addressee=request.user)
         ).select_related("requester", "addressee")
-        serializer = FriendshipSerializer(rows, many=True, context={"request": request})
+        user_ids = set()
+        for row in rows:
+            user_ids.add(row.requester_id)
+            user_ids.add(row.addressee_id)
+        avatar_by_user_id = {
+            p.linked_user_id: p.profile_photo.name
+            for p in Person.objects.filter(linked_user_id__in=user_ids).only("linked_user_id", "profile_photo")
+            if p.profile_photo
+        }
+        serializer = FriendshipSerializer(
+            rows,
+            many=True,
+            context={"request": request, "avatar_by_user_id": avatar_by_user_id},
+        )
         accepted = []
         pending_incoming = []
         pending_outgoing = []

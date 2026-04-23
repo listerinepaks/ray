@@ -1002,3 +1002,25 @@
     margin: 0;
   }
 }
+
+@keyframes floating-love-heart {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-0.65rem);
+  }
+}
+
+.floating-love-heart {
+  position: fixed;
+  right: max(1.25rem, env(safe-area-inset-right));
+  bottom: max(1.5rem, env(safe-area-inset-bottom));
+  z-index: 40;
+  font-size: 1.85rem;
+  line-height: 1;
+  color: #c94b6a;
+  pointer-events: none;
+  animation: floating-love-heart 4s ease-in-out infinite;
+}
