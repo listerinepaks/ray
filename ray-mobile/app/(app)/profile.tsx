@@ -16,21 +16,34 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts, theme } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import {
+  acceptFriendRequest,
+  fetchFriendships,
   fetchPeople,
   fetchProfile,
+  fetchSharingUsers,
   mediaUrl,
+  removeFriend,
+  sendFriendRequest,
   updateProfile,
+  type FriendshipList,
   type Person,
   type PhotoUpload,
   type Profile,
+  type SharingUser,
 } from '@/lib/api';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [people, setPeople] = useState<Person[]>([]);
+  const [sharingUsers, setSharingUsers] = useState<SharingUser[]>([]);
+  const [friendships, setFriendships] = useState<FriendshipList>({
+    accepted: [],
+    pending_incoming: [],
+    pending_outgoing: [],
+  });
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [avatarDraft, setAvatarDraft] = useState<PhotoUpload | null>(null);
@@ -46,10 +59,17 @@ export default function ProfileScreen() {
       try {
         setLoading(true);
         setError(null);
-        const [data, sharedPeople] = await Promise.all([fetchProfile(), fetchPeople()]);
+        const [data, sharedPeople, users, friendshipsData] = await Promise.all([
+          fetchProfile(),
+          fetchPeople(),
+          fetchSharingUsers(),
+          fetchFriendships(),
+        ]);
         if (cancelled) return;
         setProfile(data);
         setPeople(sharedPeople);
+        setSharingUsers(users.filter((x) => x.id !== user?.id));
+        setFriendships(friendshipsData);
         setDisplayName(data.display_name);
         setBio(data.bio);
       } catch (e) {
@@ -61,7 +81,13 @@ export default function ProfileScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user?.id]);
+
+  async function reloadSocial() {
+    const [users, friendshipsData] = await Promise.all([fetchSharingUsers(), fetchFriendships()]);
+    setSharingUsers(users.filter((x) => x.id !== user?.id));
+    setFriendships(friendshipsData);
+  }
 
   const avatarUri = useMemo(
     () => avatarDraft?.uri ?? mediaUrl(profile?.avatar),
@@ -124,6 +150,7 @@ export default function ProfileScreen() {
       setDisplayName(next.display_name);
       setBio(next.bio);
       setClaimPersonId(null);
+      await reloadSocial();
       setSaveMessage('Person claimed.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not claim this person.');
@@ -133,6 +160,65 @@ export default function ProfileScreen() {
   }
 
   const claimablePeople = people.filter((p) => p.linked_user == null);
+  const myUserId = user?.id ?? null;
+  const acceptedFriendUserIds = new Set(
+    friendships.accepted.map((f) => (f.requester_id === myUserId ? f.addressee_id : f.requester_id)),
+  );
+  const incomingUserIds = new Set(
+    friendships.pending_incoming.map((f) => (f.requester_id === myUserId ? f.addressee_id : f.requester_id)),
+  );
+  const outgoingUserIds = new Set(
+    friendships.pending_outgoing.map((f) => (f.requester_id === myUserId ? f.addressee_id : f.requester_id)),
+  );
+  const friendCandidates = sharingUsers.filter(
+    (u) =>
+      !acceptedFriendUserIds.has(u.id) && !incomingUserIds.has(u.id) && !outgoingUserIds.has(u.id),
+  );
+
+  async function onSendFriendRequest(userId: number) {
+    setSaving(true);
+    setError(null);
+    setSaveMessage(null);
+    try {
+      await sendFriendRequest(userId);
+      await reloadSocial();
+      setSaveMessage('Friend request sent.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not send friend request.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onAcceptFriendRequest(friendshipId: number) {
+    setSaving(true);
+    setError(null);
+    setSaveMessage(null);
+    try {
+      await acceptFriendRequest(friendshipId);
+      await reloadSocial();
+      setSaveMessage('Friend request accepted.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not accept friend request.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onRemoveFriend(otherUserId: number) {
+    setSaving(true);
+    setError(null);
+    setSaveMessage(null);
+    try {
+      await removeFriend(otherUserId);
+      await reloadSocial();
+      setSaveMessage('Friend removed.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not remove friend.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <ScrollView
@@ -197,6 +283,69 @@ export default function ProfileScreen() {
                   <Text style={styles.secondaryBtnText}>Claim person</Text>
                 </Pressable>
               )}
+            </View>
+          ) : null}
+
+          {profile.person_id != null ? (
+            <View style={styles.claimCard}>
+              <Text style={styles.claimTitle}>Friends</Text>
+              {friendships.pending_incoming.length > 0 ? (
+                <View style={styles.friendSection}>
+                  <Text style={styles.label}>Requests</Text>
+                  {friendships.pending_incoming.map((f) => (
+                    <View key={f.id} style={styles.friendRow}>
+                      <Text style={styles.friendName}>{f.requester_username}</Text>
+                      <Pressable
+                        disabled={saving}
+                        onPress={() => void onAcceptFriendRequest(f.id)}
+                        style={styles.secondaryBtn}>
+                        <Text style={styles.secondaryBtnText}>Accept</Text>
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+              <View style={styles.friendSection}>
+                <Text style={styles.label}>Your friends</Text>
+                {friendships.accepted.length === 0 ? (
+                  <Text style={styles.saved}>No friends yet.</Text>
+                ) : (
+                  friendships.accepted.map((f) => {
+                    const isRequester = f.requester_id === myUserId;
+                    const otherName = isRequester ? f.addressee_username : f.requester_username;
+                    const otherId = isRequester ? f.addressee_id : f.requester_id;
+                    return (
+                      <View key={f.id} style={styles.friendRow}>
+                        <Text style={styles.friendName}>{otherName}</Text>
+                        <Pressable
+                          disabled={saving}
+                          onPress={() => void onRemoveFriend(otherId)}
+                          style={styles.secondaryBtn}>
+                          <Text style={styles.secondaryBtnText}>Remove</Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })
+                )}
+              </View>
+              <View style={styles.friendSection}>
+                <Text style={styles.label}>Add friend</Text>
+                {friendCandidates.length === 0 ? (
+                  <Text style={styles.saved}>No additional users available to add right now.</Text>
+                ) : (
+                  friendCandidates.map((u) => (
+                    <View key={u.id} style={styles.friendRow}>
+                      <Text style={styles.friendName}>{u.username}</Text>
+                      <Pressable
+                        disabled={saving}
+                        onPress={() => void onSendFriendRequest(u.id)}
+                        style={styles.secondaryBtn}>
+                        <Text style={styles.secondaryBtnText}>Request</Text>
+                      </Pressable>
+                    </View>
+                  ))
+                )}
+              </View>
             </View>
           ) : null}
 
@@ -346,6 +495,20 @@ const styles = StyleSheet.create({
   },
   claimOptionText: { fontFamily: fonts.sansMedium, fontSize: 15, color: theme.textPrimary },
   claimOptionTextSelected: { fontFamily: fonts.sansSemiBold },
+  friendSection: { gap: 8 },
+  friendRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: theme.cardBg,
+  },
+  friendName: { flex: 1, fontFamily: fonts.sansMedium, fontSize: 15, color: theme.textPrimary },
   field: { gap: 6 },
   label: { fontFamily: fonts.sansMedium, fontSize: 14, color: theme.textSecondary },
   input: {

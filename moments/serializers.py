@@ -1,8 +1,8 @@
 from django.db import transaction
 from rest_framework import serializers
 
-from .access import get_moment_access_level
-from .models import Comment, Moment, MomentAccess, MomentPerson, MomentPhoto, Person, Reaction
+from .access import get_moment_access_level, sync_moment_access
+from .models import Comment, Friendship, Moment, MomentAccess, MomentPerson, MomentPhoto, Person, Reaction
 
 
 class PersonSerializer(serializers.ModelSerializer):
@@ -211,7 +211,7 @@ class MomentSerializer(serializers.ModelSerializer):
 
         moment = Moment.objects.create(**validated_data)
         self._replace_people(moment, people_data)
-        self._sync_access(moment, access_data)
+        sync_moment_access(moment, access_data)
         return moment
 
     @transaction.atomic
@@ -227,7 +227,7 @@ class MomentSerializer(serializers.ModelSerializer):
             self._replace_people(instance, people_data)
 
         if people_data is not None or access_data is not None or "visibility_mode" in validated_data:
-            self._sync_access(instance, access_data or [])
+            sync_moment_access(instance, access_data or [])
 
         return instance
 
@@ -258,54 +258,43 @@ class MomentSerializer(serializers.ModelSerializer):
             ]
         )
 
-    def _sync_access(self, moment, explicit_access_data):
-        author = moment.author
-        desired = {author.id: MomentAccess.ACCESS_EDIT}
+class FriendshipSerializer(serializers.ModelSerializer):
+    requester_id = serializers.IntegerField(source="requester.id", read_only=True)
+    requester_username = serializers.CharField(source="requester.username", read_only=True)
+    addressee_id = serializers.IntegerField(source="addressee.id", read_only=True)
+    addressee_username = serializers.CharField(source="addressee.username", read_only=True)
+    direction = serializers.SerializerMethodField()
 
-        if moment.visibility_mode == Moment.VISIBILITY_TAGGED:
-            tagged_user_ids = (
-                Person.objects.filter(moments__moment=moment, linked_user__isnull=False)
-                .values_list("linked_user_id", flat=True)
-                .distinct()
-            )
-            for user_id in tagged_user_ids:
-                if user_id != author.id:
-                    desired[user_id] = MomentAccess.ACCESS_COMMENT
+    class Meta:
+        model = Friendship
+        fields = [
+            "id",
+            "requester_id",
+            "requester_username",
+            "addressee_id",
+            "addressee_username",
+            "status",
+            "direction",
+            "created_at",
+            "accepted_at",
+        ]
+        read_only_fields = fields
 
-        elif moment.visibility_mode == Moment.VISIBILITY_CUSTOM:
-            for item in explicit_access_data:
-                user_id = item["user_id"]
-                if user_id != author.id:
-                    desired[user_id] = item["access_level"]
+    def get_direction(self, obj):
+        user = self.context["request"].user
+        if obj.requester_id == user.id:
+            return "outgoing"
+        return "incoming"
 
-        MomentAccess.objects.filter(moment=moment).exclude(user_id__in=desired.keys()).delete()
 
-        existing = {
-            row.user_id: row
-            for row in MomentAccess.objects.filter(moment=moment, user_id__in=desired.keys())
-        }
-        to_create = []
-        to_update = []
+class FriendshipRequestSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
 
-        for user_id, access_level in desired.items():
-            row = existing.get(user_id)
-            if row is None:
-                to_create.append(
-                    MomentAccess(
-                        moment=moment,
-                        user_id=user_id,
-                        access_level=access_level,
-                        granted_by=author,
-                    )
-                )
-            elif row.access_level != access_level:
-                row.access_level = access_level
-                to_update.append(row)
-
-        if to_create:
-            MomentAccess.objects.bulk_create(to_create)
-        if to_update:
-            MomentAccess.objects.bulk_update(to_update, ["access_level"])
+    def validate_user_id(self, value):
+        request_user = self.context["request"].user
+        if value == request_user.id:
+            raise serializers.ValidationError("You cannot friend yourself.")
+        return value
 
 
 class CommentSerializer(serializers.ModelSerializer):

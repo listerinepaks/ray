@@ -248,6 +248,24 @@ export type SharingUser = {
   username: string;
 };
 
+export type Friendship = {
+  id: number;
+  requester_id: number;
+  requester_username: string;
+  addressee_id: number;
+  addressee_username: string;
+  status: 'pending' | 'accepted';
+  direction: 'incoming' | 'outgoing';
+  created_at: string;
+  accepted_at: string | null;
+};
+
+export type FriendshipList = {
+  accepted: Friendship[];
+  pending_incoming: Friendship[];
+  pending_outgoing: Friendship[];
+};
+
 export async function fetchSharingUsers(): Promise<SharingUser[]> {
   const base = getApiBase();
   const res = await fetch(`${base}/api/auth/users/`, {
@@ -256,6 +274,45 @@ export async function fetchSharingUsers(): Promise<SharingUser[]> {
   if (!res.ok) throw new Error(await parseErrorBody(res));
   const data = (await res.json()) as { users: SharingUser[] };
   return data.users ?? [];
+}
+
+export async function fetchFriendships(): Promise<FriendshipList> {
+  const base = getApiBase();
+  const res = await fetch(`${base}/api/friends/`, {
+    headers: baseHeaders(),
+  });
+  if (!res.ok) throw new Error(await parseErrorBody(res));
+  return res.json() as Promise<FriendshipList>;
+}
+
+export async function sendFriendRequest(userId: number): Promise<Friendship> {
+  const base = getApiBase();
+  const res = await fetch(`${base}/api/friends/requests/`, {
+    method: 'POST',
+    headers: baseHeaders(true),
+    body: JSON.stringify({ user_id: userId }),
+  });
+  if (!res.ok) throw new Error(await parseErrorBody(res));
+  return res.json() as Promise<Friendship>;
+}
+
+export async function acceptFriendRequest(friendshipId: number): Promise<Friendship> {
+  const base = getApiBase();
+  const res = await fetch(`${base}/api/friends/requests/${friendshipId}/accept/`, {
+    method: 'POST',
+    headers: baseHeaders(),
+  });
+  if (!res.ok) throw new Error(await parseErrorBody(res));
+  return res.json() as Promise<Friendship>;
+}
+
+export async function removeFriend(userId: number): Promise<void> {
+  const base = getApiBase();
+  const res = await fetch(`${base}/api/friends/${userId}/`, {
+    method: 'DELETE',
+    headers: baseHeaders(),
+  });
+  if (!res.ok) throw new Error(await parseErrorBody(res));
 }
 
 export type CreateMomentPayload = {

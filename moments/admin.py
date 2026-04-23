@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Comment, Moment, MomentAccess, MomentPerson, MomentPhoto, Person, Reaction
+from .models import Comment, Friendship, Moment, MomentAccess, MomentPerson, MomentPhoto, Person, Reaction
 
 
 @admin.register(Person)
@@ -40,3 +40,9 @@ class CommentAdmin(admin.ModelAdmin):
 @admin.register(Reaction)
 class ReactionAdmin(admin.ModelAdmin):
     list_display = ("id", "moment", "user", "type", "created_at")
+
+
+@admin.register(Friendship)
+class FriendshipAdmin(admin.ModelAdmin):
+    list_display = ("id", "requester", "addressee", "status", "created_at", "accepted_at")
+    list_filter = ("status",)

@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.db.models.functions import Greatest, Least
 
 
 class Person(models.Model):
@@ -46,10 +47,12 @@ class Moment(models.Model):
     VISIBILITY_PRIVATE = "private"
     VISIBILITY_TAGGED = "tagged"
     VISIBILITY_CUSTOM = "custom"
+    VISIBILITY_FRIENDS = "friends"
     VISIBILITY_CHOICES = [
         (VISIBILITY_PRIVATE, "Private"),
         (VISIBILITY_TAGGED, "Tagged People"),
         (VISIBILITY_CUSTOM, "Custom"),
+        (VISIBILITY_FRIENDS, "Friends"),
     ]
 
     author = models.ForeignKey(
@@ -163,6 +166,42 @@ class MomentAccess(models.Model):
                 fields=["moment", "user"],
                 name="unique_access_per_user_per_moment",
             )
+        ]
+
+
+class Friendship(models.Model):
+    STATUS_PENDING = "pending"
+    STATUS_ACCEPTED = "accepted"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_ACCEPTED, "Accepted"),
+    ]
+
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="friendships_requested",
+    )
+    addressee = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="friendships_received",
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=~models.Q(requester=models.F("addressee")),
+                name="friendship_requester_not_addressee",
+            ),
+            models.UniqueConstraint(
+                Least("requester", "addressee"),
+                Greatest("requester", "addressee"),
+                name="friendship_unique_unordered_pair",
+            ),
         ]
 
 

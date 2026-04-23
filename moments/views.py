@@ -1,5 +1,6 @@
 from django.db import IntegrityError
 from django.http import Http404
+from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -7,8 +8,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from .access import get_moment_for_nested_view
-from .models import Comment, Moment, MomentPhoto, Person, Reaction
+from .access import (
+    accept_friendship,
+    get_moment_for_nested_view,
+    resync_friends_moments_for_user,
+    resync_tagged_moment_access_for_person,
+)
+from .models import Comment, Friendship, Moment, MomentPhoto, Person, Reaction
 from .permissions import (
     CommentPermission,
     MomentEditPermission,
@@ -18,6 +24,8 @@ from .permissions import (
 )
 from .serializers import (
     CommentSerializer,
+    FriendshipRequestSerializer,
+    FriendshipSerializer,
     MomentPhotoSerializer,
     MomentSerializer,
     PersonSerializer,
@@ -80,6 +88,7 @@ class ProfileMeView(APIView):
     def patch(self, request):
         person = self.get_object()
         person_id = request.data.get("person_id")
+        linked_just_now = False
 
         if person_id not in (None, "", "null"):
             try:
@@ -101,12 +110,14 @@ class ProfileMeView(APIView):
                 if not person.created_by_id:
                     person.created_by = request.user
                 person.save(update_fields=["linked_user", "created_by"])
+                linked_just_now = True
             else:
                 person = Person.objects.create(
                     created_by=request.user,
                     linked_user=request.user,
                     name=self._default_name(),
                 )
+                linked_just_now = True
         elif person_id is not None and person_id != person.id:
             return Response({"person_id": ["Your account is already linked to a different person."]}, status=400)
 
@@ -118,6 +129,8 @@ class ProfileMeView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        if linked_just_now:
+            resync_tagged_moment_access_for_person(person)
         return Response(serializer.data)
 
 
@@ -229,3 +242,100 @@ class ReactionViewSet(ModelViewSet):
                 {"type": ["You already have a reaction of this type on this moment."]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+
+class FriendshipListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        rows = (
+            Friendship.objects.filter(requester=request.user)
+            | Friendship.objects.filter(addressee=request.user)
+        ).select_related("requester", "addressee")
+        serializer = FriendshipSerializer(rows, many=True, context={"request": request})
+        accepted = []
+        pending_incoming = []
+        pending_outgoing = []
+        for item in serializer.data:
+            if item["status"] == Friendship.STATUS_ACCEPTED:
+                accepted.append(item)
+            elif item["direction"] == "incoming":
+                pending_incoming.append(item)
+            else:
+                pending_outgoing.append(item)
+        return Response(
+            {
+                "accepted": accepted,
+                "pending_incoming": pending_incoming,
+                "pending_outgoing": pending_outgoing,
+            }
+        )
+
+
+class FriendshipRequestCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = FriendshipRequestSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        target_user_id = serializer.validated_data["user_id"]
+        User = get_user_model()
+        if not User.objects.filter(id=target_user_id).exists():
+            return Response({"user_id": ["That user does not exist."]}, status=400)
+
+        existing = Friendship.objects.filter(
+            requester_id__in=[request.user.id, target_user_id],
+            addressee_id__in=[request.user.id, target_user_id],
+        ).first()
+        if existing is not None:
+            if existing.status == Friendship.STATUS_ACCEPTED:
+                return Response({"detail": "You are already friends."}, status=400)
+            if existing.requester_id == request.user.id:
+                return Response({"detail": "A request is already pending."}, status=400)
+            accepted = accept_friendship(existing)
+            return Response(
+                FriendshipSerializer(accepted, context={"request": request}).data,
+                status=status.HTTP_200_OK,
+            )
+
+        friendship = Friendship.objects.create(
+            requester=request.user,
+            addressee_id=target_user_id,
+            status=Friendship.STATUS_PENDING,
+        )
+        return Response(
+            FriendshipSerializer(friendship, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class FriendshipAcceptView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, friendship_id: int):
+        friendship = Friendship.objects.filter(id=friendship_id, addressee=request.user).first()
+        if friendship is None:
+            raise Http404
+        if friendship.status == Friendship.STATUS_ACCEPTED:
+            return Response({"detail": "Friend request already accepted."}, status=400)
+        accepted = accept_friendship(friendship)
+        return Response(FriendshipSerializer(accepted, context={"request": request}).data)
+
+
+class FriendshipDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, user_id: int):
+        row = Friendship.objects.filter(
+            requester_id__in=[request.user.id, user_id],
+            addressee_id__in=[request.user.id, user_id],
+        ).first()
+        if row is None:
+            raise Http404
+        ids = [row.requester_id, row.addressee_id]
+        row.delete()
+        for uid in ids:
+            # Friendship visibility is derived from accepted connections.
+            # Rebuild both sides to remove friend-based access.
+            resync_friends_moments_for_user(uid)
+        return Response(status=status.HTTP_204_NO_CONTENT)

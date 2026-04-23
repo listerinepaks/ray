@@ -44,6 +44,7 @@ const VIS = {
   private: 'private',
   tagged: 'tagged',
   custom: 'custom',
+  friends: 'friends',
 } as const;
 
 const ACCESS_LEVELS = [
@@ -792,6 +793,17 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
                 <Text style={styles.visTitle}>Custom</Text>
                 <Text style={styles.visBody}>
                   Pick exactly who can view, comment, or edit — by account.
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setVisibilityMode(VIS.friends)}
+                style={[
+                  styles.visCard,
+                  visibility === VIS.friends && styles.visCardSelected,
+                ]}>
+                <Text style={styles.visTitle}>Friends</Text>
+                <Text style={styles.visBody}>
+                  Shared with accepted friends. Great for family and close people.
                 </Text>
               </Pressable>
             </View>

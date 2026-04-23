@@ -7,6 +7,10 @@ from rest_framework.routers import DefaultRouter
 from . import auth_views, views as config_views
 from moments.views import (
     CommentViewSet,
+    FriendshipAcceptView,
+    FriendshipDeleteView,
+    FriendshipListView,
+    FriendshipRequestCreateView,
     MomentPhotoViewSet,
     MomentViewSet,
     PersonViewSet,
@@ -30,6 +34,10 @@ urlpatterns = [
     path("api/auth/users/", auth_views.AuthUsersView.as_view()),
     path("api/profile/me/", ProfileMeView.as_view()),
     path("api/profile/people/<int:person_id>/", ProfilePersonView.as_view()),
+    path("api/friends/", FriendshipListView.as_view()),
+    path("api/friends/requests/", FriendshipRequestCreateView.as_view()),
+    path("api/friends/requests/<int:friendship_id>/accept/", FriendshipAcceptView.as_view()),
+    path("api/friends/<int:user_id>/", FriendshipDeleteView.as_view()),
     path("api/auth/token/", auth_views.auth_token_obtain),
     path("api/auth/token/revoke/", auth_views.auth_token_revoke),
     path("api/", include(router.urls)),

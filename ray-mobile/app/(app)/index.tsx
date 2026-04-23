@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useRouter, useNavigation } from 'expo-router';
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -24,11 +24,20 @@ import {
   LIST_REFLECTION_MAX_WORDS,
   truncateWords,
 } from '@/lib/truncateWords';
-import { fetchMoments, fetchProfile, mediaUrl, type Moment, type Profile } from '@/lib/api';
+import {
+  fetchFriendships,
+  fetchMoments,
+  fetchProfile,
+  mediaUrl,
+  type Moment,
+  type Profile,
+} from '@/lib/api';
 
 function formatKindLabel(kind: string): string {
   return kind === 'sunrise' ? 'Sunrise' : kind === 'sunset' ? 'Sunset' : kind;
 }
+
+type FeedTab = 'all' | 'friends' | 'mentions';
 
 export default function TimelineScreen() {
   const insets = useSafeAreaInsets();
@@ -42,19 +51,26 @@ export default function TimelineScreen() {
   const [error, setError] = useState<string | null>(null);
   const [todaySunTimes, setTodaySunTimes] = useState<{ sunrise: string; sunset: string } | null>(null);
   const [sunLineFallback, setSunLineFallback] = useState('Finding sunrise and sunset…');
+  const [feedTab, setFeedTab] = useState<FeedTab>('all');
+  const [friendUserIds, setFriendUserIds] = useState<Set<number>>(new Set());
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const list = await fetchMoments();
+      const [list, friendships] = await Promise.all([fetchMoments(), fetchFriendships()]);
       setMoments(list);
+      const accepted = new Set<number>();
+      for (const row of friendships.accepted) {
+        accepted.add(row.requester_id === user?.id ? row.addressee_id : row.requester_id);
+      }
+      setFriendUserIds(accepted);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load moments.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     void load();
@@ -143,25 +159,40 @@ export default function TimelineScreen() {
     });
   }, [navigation, profile?.avatar, profile?.display_name, router, user?.username]);
 
+  const visibleMoments = useMemo(() => {
+    if (feedTab === 'friends') return moments.filter((m) => friendUserIds.has(m.author));
+    if (feedTab === 'mentions') {
+      return moments.filter((m) =>
+        m.tagged_people.some(
+          (p) =>
+            (user?.id != null && p.linked_user === user.id) ||
+            (profile?.person_id != null && p.id === profile.person_id),
+        ),
+      );
+    }
+    return moments;
+  }, [feedTab, friendUserIds, moments, profile?.person_id, user?.id]);
+
   return (
-    <ScrollView
-      style={styles.root}
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={[
-        styles.content,
-        { paddingBottom: Math.max(insets.bottom, 24) },
-      ]}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            setRefreshing(true);
-            void load();
-          }}
-          tintColor={theme.textSecondary}
-        />
-      }>
-      <View style={styles.sunInline}>
+    <View style={styles.screen}>
+      <ScrollView
+        style={styles.root}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: Math.max(insets.bottom + 92, 112) },
+        ]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              void load();
+            }}
+            tintColor={theme.textSecondary}
+          />
+        }>
+        <View style={styles.sunInline}>
         {todaySunTimes ? (
           <>
             <View style={styles.sunInlineItem}>
@@ -179,7 +210,7 @@ export default function TimelineScreen() {
             <Text style={styles.sunInlineText}>{sunLineFallback}</Text>
           </View>
         )}
-      </View>
+        </View>
 
       {loading ? (
         <ActivityIndicator color={theme.textSecondary} style={{ marginTop: 16 }} />
@@ -191,12 +222,18 @@ export default function TimelineScreen() {
         </View>
       ) : null}
 
-      {!loading && !error && moments.length === 0 ? (
-        <Text style={styles.muted}>No moments yet — create one to get started.</Text>
+      {!loading && !error && visibleMoments.length === 0 ? (
+        <Text style={styles.muted}>
+          {feedTab === 'friends'
+            ? 'No friend moments yet.'
+            : feedTab === 'mentions'
+              ? 'No moments mention you yet.'
+              : 'No moments yet — create one to get started.'}
+        </Text>
       ) : null}
 
       <View style={styles.list}>
-        {moments.map((m) => {
+        {visibleMoments.map((m) => {
           const photos = m.photos ?? [];
           const thumb = photos.length
             ? [...photos].sort((a, b) => a.sort_order - b.sort_order)[0]
@@ -263,11 +300,34 @@ export default function TimelineScreen() {
           );
         })}
       </View>
-    </ScrollView>
+      </ScrollView>
+      <View style={[styles.feedTabs, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+        <Pressable
+          onPress={() => setFeedTab('all')}
+          style={[styles.feedTabBtn, feedTab === 'all' && styles.feedTabBtnOn]}>
+          <Text style={[styles.feedTabText, feedTab === 'all' && styles.feedTabTextOn]}>All</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setFeedTab('friends')}
+          style={[styles.feedTabBtn, feedTab === 'friends' && styles.feedTabBtnOn]}>
+          <Text style={[styles.feedTabText, feedTab === 'friends' && styles.feedTabTextOn]}>
+            Friends
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setFeedTab('mentions')}
+          style={[styles.feedTabBtn, feedTab === 'mentions' && styles.feedTabBtnOn]}>
+          <Text style={[styles.feedTabText, feedTab === 'mentions' && styles.feedTabTextOn]}>
+            Mentions
+          </Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: theme.bgPrimary },
   root: { flex: 1, backgroundColor: theme.bgPrimary },
   content: {
     maxWidth: 640,
@@ -450,4 +510,34 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     color: theme.textPrimary,
   },
+  feedTabs: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 0,
+    flexDirection: 'row',
+    gap: 8,
+    paddingTop: 10,
+    paddingHorizontal: 10,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    backgroundColor: theme.cardBg,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+  },
+  feedTabBtn: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.bgSecondary,
+  },
+  feedTabBtnOn: { backgroundColor: theme.pillBg },
+  feedTabText: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 13,
+    color: theme.textSecondary,
+  },
+  feedTabTextOn: { color: theme.textPrimary },
 });
