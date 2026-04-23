@@ -1,3 +1,4 @@
+from django.core.files.storage import default_storage
 from django.db import transaction
 from rest_framework import serializers
 
@@ -171,17 +172,33 @@ class MomentSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "author", "created_at", "updated_at"]
 
     def get_author_avatar(self, obj):
-        path = getattr(obj, "author_avatar", None)
-        if path:
-            return path
-        linked = (
-            Person.objects.filter(linked_user_id=obj.author_id)
-            .exclude(profile_photo="")
-            .order_by("id")
-            .values_list("profile_photo", flat=True)
-            .first()
-        )
-        return linked or None
+        """Return a fetchable URL; DB/annotate only stores the storage key (same as ImageField.name)."""
+        key = getattr(obj, "author_avatar", None)
+        if not key:
+            p = (
+                Person.objects.filter(linked_user_id=obj.author_id)
+                .exclude(profile_photo="")
+                .order_by("id")
+                .first()
+            )
+            if not p or not p.profile_photo:
+                return None
+            key = p.profile_photo.name
+        if not key:
+            return None
+        s = str(key).strip()
+        if s.startswith(("http://", "https://")):
+            return s
+        try:
+            url = default_storage.url(s)
+        except Exception:
+            return None
+        if url.startswith(("http://", "https://")):
+            return url
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(url)
+        return url
 
     def get_comments_count(self, obj):
         c = getattr(obj, "comments_count", None)

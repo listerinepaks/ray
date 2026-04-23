@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -245,6 +246,8 @@ export default function MomentEntryScreen() {
   const displayTitle =
     moment.title.trim() ||
     `${formatKindLabel(moment.kind)} · ${formatSmartDate(moment.date)}`;
+  const posterName = moment.author_username ?? `user_${moment.author}`;
+  const posterAvatarUri = moment.author_avatar ? mediaUrl(moment.author_avatar) : '';
 
   return (
     <ScrollView
@@ -268,6 +271,21 @@ export default function MomentEntryScreen() {
             </View>
           </View>
         ) : null}
+
+        <View style={styles.detailPoster}>
+          {posterAvatarUri ? (
+            <Image source={{ uri: posterAvatarUri }} style={styles.detailPosterAvatar} />
+          ) : (
+            <View style={styles.detailPosterAvatarFallback}>
+              <Text style={styles.detailPosterAvatarLetter}>
+                {posterName.slice(0, 1).toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <Text style={styles.detailPosterName} numberOfLines={1}>
+            {posterName}
+          </Text>
+        </View>
 
         {hero ? (
           <View style={styles.hero}>
@@ -495,6 +513,42 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.pillFg,
     textTransform: 'lowercase',
+  },
+  detailPoster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    marginBottom: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(47, 47, 47, 0.1)',
+  },
+  detailPosterAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.bgSecondary,
+  },
+  detailPosterAvatarFallback: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.bgSecondary,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailPosterAvatarLetter: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 15,
+    color: theme.textPrimary,
+  },
+  detailPosterName: {
+    flex: 1,
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 15,
+    color: theme.textPrimary,
   },
   hero: {
     borderRadius: 16,
