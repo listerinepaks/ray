@@ -1,12 +1,28 @@
-import { useEffect, useState } from 'react'
+import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AspectFitImage } from '../components/AspectFitImage'
 import { LocationPinIcon } from '../components/LocationPinIcon'
 import { formatSmartDate } from '../formatSmartDate'
-import { fetchMoment, mediaUrl, MomentNotFoundError, type Moment } from '../api'
+import {
+  createMomentComment,
+  createMomentReaction,
+  deleteMomentComment,
+  deleteMomentReaction,
+  fetchMoment,
+  fetchMomentComments,
+  fetchMomentReactions,
+  mediaUrl,
+  MomentNotFoundError,
+  type Me,
+  type Moment,
+  type MomentComment,
+  type MomentReaction,
+} from '../api'
 
 function formatKindLabel(kind: string): string {
-  return kind === 'sunrise' ? 'Sunrise' : kind === 'sunset' ? 'Sunset' : kind
+  if (kind === 'sunrise') return 'Sunrise'
+  if (kind === 'sunset') return 'Sunset'
+  return 'Other'
 }
 
 function formatObserved(iso: string | null): string | null {
@@ -22,12 +38,41 @@ function formatObserved(iso: string | null): string | null {
   }
 }
 
-export function EntryView() {
+function formatCommentTime(iso: string): string {
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return ''
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(d)
+  } catch {
+    return ''
+  }
+}
+
+const REACTION_TYPES = [
+  { type: 'heart', label: 'Heart', emoji: '❤️' },
+  { type: 'glow', label: 'Glow', emoji: '✨' },
+  { type: 'wow', label: 'Wow', emoji: '⚡' },
+] as const
+
+export function EntryView({ currentUser }: { currentUser: Me }) {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [moment, setMoment] = useState<Moment | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const [comments, setComments] = useState<MomentComment[]>([])
+  const [reactions, setReactions] = useState<MomentReaction[]>([])
+  const [socialError, setSocialError] = useState<string | null>(null)
+  const [commentDraft, setCommentDraft] = useState('')
+  const [postingComment, setPostingComment] = useState(false)
+  const [reactionBusy, setReactionBusy] = useState<string | null>(null)
+  const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -59,9 +104,103 @@ export function EntryView() {
     }
   }, [id, navigate])
 
+  const reloadSocial = useCallback(async (momentId: number) => {
+    setSocialError(null)
+    try {
+      const [c, r] = await Promise.all([
+        fetchMomentComments(momentId),
+        fetchMomentReactions(momentId),
+      ])
+      setComments(c)
+      setReactions(r)
+    } catch (e) {
+      setSocialError(e instanceof Error ? e.message : 'Could not load reactions or comments.')
+    }
+  }, [])
+
+  useEffect(() => {
+    if (moment?.id == null) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        setSocialError(null)
+        const [c, r] = await Promise.all([
+          fetchMomentComments(moment.id),
+          fetchMomentReactions(moment.id),
+        ])
+        if (!cancelled) {
+          setComments(c)
+          setReactions(r)
+        }
+      } catch (e) {
+        if (!cancelled)
+          setSocialError(e instanceof Error ? e.message : 'Could not load reactions or comments.')
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [moment?.id])
+
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [id])
+
+  const canCommentOrReact =
+    moment?.my_access === 'comment' || moment?.my_access === 'edit'
+
+  async function onSubmitComment(e: FormEvent) {
+    e.preventDefault()
+    if (!moment || !canCommentOrReact) return
+    const text = commentDraft.trim()
+    if (!text) return
+    setPostingComment(true)
+    setSocialError(null)
+    try {
+      const row = await createMomentComment(moment.id, text)
+      setCommentDraft('')
+      setComments((prev) => [...prev, row])
+    } catch (err) {
+      setSocialError(err instanceof Error ? err.message : 'Could not post comment.')
+    } finally {
+      setPostingComment(false)
+    }
+  }
+
+  async function onToggleReaction(type: string) {
+    if (!moment || !canCommentOrReact) return
+    const mine = reactions.find((x) => x.user === currentUser.id && x.type === type)
+    setReactionBusy(type)
+    setSocialError(null)
+    try {
+      if (mine) {
+        await deleteMomentReaction(moment.id, mine.id)
+        setReactions((prev) => prev.filter((x) => x.id !== mine.id))
+      } else {
+        const row = await createMomentReaction(moment.id, type)
+        setReactions((prev) => [...prev, row])
+      }
+    } catch (err) {
+      setSocialError(err instanceof Error ? err.message : 'Could not update reaction.')
+      await reloadSocial(moment.id)
+    } finally {
+      setReactionBusy(null)
+    }
+  }
+
+  async function onDeleteComment(commentId: number) {
+    if (!moment) return
+    setDeletingCommentId(commentId)
+    setSocialError(null)
+    try {
+      await deleteMomentComment(moment.id, commentId)
+      setComments((prev) => prev.filter((c) => c.id !== commentId))
+    } catch (err) {
+      setSocialError(err instanceof Error ? err.message : 'Could not delete comment.')
+    } finally {
+      setDeletingCommentId(null)
+    }
+  }
 
   if (loading) {
     return (
@@ -193,7 +332,99 @@ export function EntryView() {
           </div>
         ) : null}
 
-        
+        {moment.my_access ? (
+          <section className="entry-social" aria-label="Reactions and comments">
+            <h2 className="entry-section-label">Reactions</h2>
+            {socialError ? (
+              <p className="entry-social-error" role="alert">
+                {socialError}
+              </p>
+            ) : null}
+            <div className="entry-reaction-bar">
+              {REACTION_TYPES.map(({ type, label, emoji }) => {
+                const count = reactions.filter((r) => r.type === type).length
+                const mine = reactions.some((r) => r.user === currentUser.id && r.type === type)
+                const busy = reactionBusy === type
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    className={`entry-reaction-btn${mine ? ' entry-reaction-btn--mine' : ''}`}
+                    disabled={!canCommentOrReact || busy}
+                    onClick={() => void onToggleReaction(type)}
+                    aria-pressed={mine}
+                    aria-label={`${label}, ${count}`}>
+                    {busy ? (
+                      <span className="entry-reaction-busy">…</span>
+                    ) : (
+                      <>
+                        <span className="entry-reaction-emoji" aria-hidden>
+                          {emoji}
+                        </span>
+                        <span className="entry-reaction-count">{count}</span>
+                      </>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+            {!canCommentOrReact ? (
+              <p className="entry-social-hint muted">View-only: you can see reactions but not add your own.</p>
+            ) : null}
+
+            <h2 className="entry-section-label entry-comments-heading">Comments</h2>
+            {comments.length === 0 ? (
+              <p className="muted entry-no-comments">No comments yet.</p>
+            ) : (
+              <ul className="entry-comment-list">
+                {comments.map((c) => (
+                  <li key={c.id} className="entry-comment-card">
+                    <div className="entry-comment-head">
+                      <span className="entry-comment-author">
+                        {c.author_username ?? `User ${c.author}`}
+                      </span>
+                      <time className="entry-comment-time" dateTime={c.created_at}>
+                        {formatCommentTime(c.created_at)}
+                      </time>
+                    </div>
+                    <p className="entry-comment-body">{c.text}</p>
+                    {c.author === currentUser.id ? (
+                      <button
+                        type="button"
+                        className="entry-comment-remove"
+                        disabled={deletingCommentId === c.id}
+                        onClick={() => void onDeleteComment(c.id)}>
+                        {deletingCommentId === c.id ? 'Removing…' : 'Remove'}
+                      </button>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {canCommentOrReact ? (
+              <form className="entry-comment-form" onSubmit={onSubmitComment}>
+                <label className="entry-comment-label">
+                  <span className="visually-hidden">New comment</span>
+                  <textarea
+                    className="entry-comment-input"
+                    value={commentDraft}
+                    onChange={(e) => setCommentDraft(e.target.value)}
+                    placeholder="Write a comment…"
+                    rows={3}
+                    disabled={postingComment}
+                  />
+                </label>
+                <button
+                  type="submit"
+                  className="entry-comment-submit"
+                  disabled={postingComment || !commentDraft.trim()}>
+                  {postingComment ? 'Posting…' : 'Post'}
+                </button>
+              </form>
+            ) : null}
+          </section>
+        ) : null}
       </div>
     </article>
   )

@@ -245,6 +245,115 @@ export async function fetchMoment(id: number): Promise<Moment> {
   return res.json() as Promise<Moment>
 }
 
+export type MomentComment = {
+  id: number
+  moment: number
+  author: number
+  author_username?: string
+  text: string
+  created_at: string
+  updated_at: string
+}
+
+export type MomentReaction = {
+  id: number
+  moment: number
+  user: number
+  user_username?: string
+  type: string
+  created_at: string
+}
+
+export async function fetchMomentComments(momentId: number): Promise<MomentComment[]> {
+  const base = getApiBase()
+  const res = await fetch(`${base}/api/moments/${momentId}/comments/`, {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await parseErrorBody(res))
+  const data = (await res.json()) as MomentComment[] | { results?: MomentComment[] }
+  if (Array.isArray(data)) return data
+  return data.results ?? []
+}
+
+export async function createMomentComment(momentId: number, text: string): Promise<MomentComment> {
+  await ensureCsrfCookie()
+  const token = getCsrfTokenFromDocument()
+  const base = getApiBase()
+  const res = await fetch(`${base}/api/moments/${momentId}/comments/`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(token ? { 'X-CSRFToken': token } : {}),
+    },
+    body: JSON.stringify({ text }),
+  })
+  if (!res.ok) throw new Error(await parseErrorBody(res))
+  return res.json() as Promise<MomentComment>
+}
+
+export async function deleteMomentComment(momentId: number, commentId: number): Promise<void> {
+  await ensureCsrfCookie()
+  const token = getCsrfTokenFromDocument()
+  const base = getApiBase()
+  const res = await fetch(`${base}/api/moments/${momentId}/comments/${commentId}/`, {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { 'X-CSRFToken': token } : {}),
+    },
+  })
+  if (!res.ok) throw new Error(await parseErrorBody(res))
+}
+
+export async function fetchMomentReactions(momentId: number): Promise<MomentReaction[]> {
+  const base = getApiBase()
+  const res = await fetch(`${base}/api/moments/${momentId}/reactions/`, {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await parseErrorBody(res))
+  const data = (await res.json()) as MomentReaction[] | { results?: MomentReaction[] }
+  if (Array.isArray(data)) return data
+  return data.results ?? []
+}
+
+export async function createMomentReaction(momentId: number, type: string): Promise<MomentReaction> {
+  await ensureCsrfCookie()
+  const token = getCsrfTokenFromDocument()
+  const base = getApiBase()
+  const res = await fetch(`${base}/api/moments/${momentId}/reactions/`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(token ? { 'X-CSRFToken': token } : {}),
+    },
+    body: JSON.stringify({ type }),
+  })
+  if (!res.ok) throw new Error(await parseErrorBody(res))
+  return res.json() as Promise<MomentReaction>
+}
+
+export async function deleteMomentReaction(momentId: number, reactionId: number): Promise<void> {
+  await ensureCsrfCookie()
+  const token = getCsrfTokenFromDocument()
+  const base = getApiBase()
+  const res = await fetch(`${base}/api/moments/${momentId}/reactions/${reactionId}/`, {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { 'X-CSRFToken': token } : {}),
+    },
+  })
+  if (!res.ok) throw new Error(await parseErrorBody(res))
+}
+
 export type Person = {
   id: number
   name: string

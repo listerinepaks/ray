@@ -1,14 +1,36 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AspectFitImage } from '@/components/AspectFitImage';
 import { RayLogo } from '@/components/RayLogo';
+import { useAuth } from '@/contexts/AuthContext';
 import { fonts, theme } from '@/constants/theme';
 import { formatSmartDate } from '@/lib/formatSmartDate';
-import { fetchMoment, mediaUrl, MomentNotFoundError, type Moment } from '@/lib/api';
+import {
+  createMomentComment,
+  createMomentReaction,
+  deleteMomentComment,
+  deleteMomentReaction,
+  fetchMoment,
+  fetchMomentComments,
+  fetchMomentReactions,
+  mediaUrl,
+  MomentNotFoundError,
+  type Moment,
+  type MomentComment,
+  type MomentReaction,
+} from '@/lib/api';
 
 function formatKindLabel(kind: string): string {
   return kind === 'sunrise' ? 'Sunrise' : kind === 'sunset' ? 'Sunset' : kind;
@@ -27,9 +49,31 @@ function formatObserved(iso: string | null): string | null {
   }
 }
 
+const REACTION_TYPES = [
+  { type: 'heart', icon: 'heart' as const, label: 'Heart' },
+  { type: 'glow', icon: 'sparkles' as const, label: 'Glow' },
+  { type: 'wow', icon: 'flash' as const, label: 'Wow' },
+] as const;
+
+function formatCommentTime(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(d);
+  } catch {
+    return '';
+  }
+}
+
 export default function MomentEntryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user: currentUser } = useAuth();
   const { id: raw } = useLocalSearchParams<{ id: string }>();
   const id = useMemo(() => {
     const n = raw ? Number.parseInt(raw, 10) : Number.NaN;
@@ -39,6 +83,14 @@ export default function MomentEntryScreen() {
   const [moment, setMoment] = useState<Moment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [comments, setComments] = useState<MomentComment[]>([]);
+  const [reactions, setReactions] = useState<MomentReaction[]>([]);
+  const [socialError, setSocialError] = useState<string | null>(null);
+  const [commentDraft, setCommentDraft] = useState('');
+  const [postingComment, setPostingComment] = useState(false);
+  const [reactionBusy, setReactionBusy] = useState<string | null>(null);
+  const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null);
 
   useEffect(() => {
     if (id == null) {
@@ -68,6 +120,99 @@ export default function MomentEntryScreen() {
       cancelled = true;
     };
   }, [id, router]);
+
+  const reloadSocial = useCallback(async (momentId: number) => {
+    setSocialError(null);
+    try {
+      const [c, r] = await Promise.all([
+        fetchMomentComments(momentId),
+        fetchMomentReactions(momentId),
+      ]);
+      setComments(c);
+      setReactions(r);
+    } catch (e) {
+      setSocialError(e instanceof Error ? e.message : 'Could not load reactions or comments.');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (moment?.id == null) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        setSocialError(null);
+        const [c, r] = await Promise.all([
+          fetchMomentComments(moment.id),
+          fetchMomentReactions(moment.id),
+        ]);
+        if (!cancelled) {
+          setComments(c);
+          setReactions(r);
+        }
+      } catch (e) {
+        if (!cancelled)
+          setSocialError(e instanceof Error ? e.message : 'Could not load reactions or comments.');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [moment?.id]);
+
+  const canCommentOrReact =
+    moment?.my_access === 'comment' || moment?.my_access === 'edit';
+
+  async function onSubmitComment() {
+    if (!moment || !canCommentOrReact) return;
+    const text = commentDraft.trim();
+    if (!text) return;
+    setPostingComment(true);
+    setSocialError(null);
+    try {
+      const row = await createMomentComment(moment.id, text);
+      setCommentDraft('');
+      setComments((prev) => [...prev, row]);
+    } catch (e) {
+      setSocialError(e instanceof Error ? e.message : 'Could not post comment.');
+    } finally {
+      setPostingComment(false);
+    }
+  }
+
+  async function onToggleReaction(type: string) {
+    if (!moment || !currentUser || !canCommentOrReact) return;
+    const mine = reactions.find((x) => x.user === currentUser.id && x.type === type);
+    setReactionBusy(type);
+    setSocialError(null);
+    try {
+      if (mine) {
+        await deleteMomentReaction(moment.id, mine.id);
+        setReactions((prev) => prev.filter((x) => x.id !== mine.id));
+      } else {
+        const row = await createMomentReaction(moment.id, type);
+        setReactions((prev) => [...prev, row]);
+      }
+    } catch (e) {
+      setSocialError(e instanceof Error ? e.message : 'Could not update reaction.');
+      await reloadSocial(moment.id);
+    } finally {
+      setReactionBusy(null);
+    }
+  }
+
+  async function onDeleteComment(commentId: number) {
+    if (!moment) return;
+    setDeletingCommentId(commentId);
+    setSocialError(null);
+    try {
+      await deleteMomentComment(moment.id, commentId);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch (e) {
+      setSocialError(e instanceof Error ? e.message : 'Could not delete comment.');
+    } finally {
+      setDeletingCommentId(null);
+    }
+  }
 
   if (loading) {
     return (
@@ -196,6 +341,116 @@ export default function MomentEntryScreen() {
                 </Pressable>
               ))}
             </View>
+          </View>
+        ) : null}
+
+        {moment.my_access ? (
+          <View style={styles.social}>
+            <Text style={styles.sectionLabel}>Reactions</Text>
+            {socialError ? (
+              <Text style={styles.socialError} accessibilityRole="alert">
+                {socialError}
+              </Text>
+            ) : null}
+            <View style={styles.reactionRow}>
+              {REACTION_TYPES.map(({ type, icon, label }) => {
+                const count = reactions.filter((r) => r.type === type).length;
+                const mine = currentUser
+                  ? reactions.some((r) => r.user === currentUser.id && r.type === type)
+                  : false;
+                const busy = reactionBusy === type;
+                return (
+                  <Pressable
+                    key={type}
+                    disabled={!canCommentOrReact || busy}
+                    onPress={() => void onToggleReaction(type)}
+                    style={({ pressed }) => [
+                      styles.reactionBtn,
+                      mine && styles.reactionBtnMine,
+                      (!canCommentOrReact || busy) && styles.reactionBtnDisabled,
+                      pressed && canCommentOrReact && !busy && { opacity: 0.88 },
+                    ]}
+                    accessibilityLabel={`${label}${mine ? ', selected' : ''}, ${count}`}>
+                    {busy ? (
+                      <ActivityIndicator size="small" color={theme.textSecondary} />
+                    ) : (
+                      <>
+                        <Ionicons
+                          name={icon}
+                          size={22}
+                          color={mine ? theme.accentDusk : theme.textSecondary}
+                        />
+                        <Text style={[styles.reactionCount, mine && styles.reactionCountMine]}>
+                          {count}
+                        </Text>
+                      </>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+            {!canCommentOrReact ? (
+              <Text style={styles.socialHint}>View-only: you can see reactions but not add your own.</Text>
+            ) : null}
+
+            <Text style={[styles.sectionLabel, styles.commentsHeading]}>Comments</Text>
+            {comments.length === 0 ? (
+              <Text style={styles.noComments}>No comments yet.</Text>
+            ) : (
+              <View style={styles.commentList}>
+                {comments.map((c) => (
+                  <View key={c.id} style={styles.commentCard}>
+                    <View style={styles.commentHead}>
+                      <Text style={styles.commentAuthor}>
+                        {c.author_username ?? `User ${c.author}`}
+                      </Text>
+                      <Text style={styles.commentTime}>{formatCommentTime(c.created_at)}</Text>
+                    </View>
+                    <Text style={styles.commentBody}>{c.text}</Text>
+                    {currentUser && c.author === currentUser.id ? (
+                      <Pressable
+                        onPress={() => void onDeleteComment(c.id)}
+                        disabled={deletingCommentId === c.id}
+                        hitSlop={8}
+                        style={styles.commentDelete}>
+                        <Text style={styles.commentDeleteText}>
+                          {deletingCommentId === c.id ? 'Removing…' : 'Remove'}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {canCommentOrReact ? (
+              <View style={styles.commentComposer}>
+                <TextInput
+                  value={commentDraft}
+                  onChangeText={setCommentDraft}
+                  placeholder="Write a comment…"
+                  placeholderTextColor={theme.textMuted}
+                  multiline
+                  style={styles.commentInput}
+                  editable={!postingComment}
+                  textAlignVertical="top"
+                />
+                <Pressable
+                  onPress={() => void onSubmitComment()}
+                  disabled={postingComment || !commentDraft.trim()}
+                  style={({ pressed }) => [
+                    styles.commentPostBtn,
+                    (postingComment || !commentDraft.trim()) && styles.commentPostBtnDisabled,
+                    pressed && !postingComment && commentDraft.trim() && { opacity: 0.92 },
+                  ]}>
+                  {postingComment ? (
+                    <ActivityIndicator color={theme.textPrimary} size="small" />
+                  ) : (
+                    <Text style={styles.commentPostBtnText}>Post</Text>
+                  )}
+                </Pressable>
+              </View>
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -340,4 +595,121 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(167, 183, 201, 0.28)',
   },
   chipText: { fontFamily: fonts.sansMedium, fontSize: 14, color: theme.textPrimary },
+  social: {
+    marginTop: 28,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(47, 47, 47, 0.08)',
+  },
+  socialError: {
+    fontFamily: fonts.sansRegular,
+    fontSize: 14,
+    color: theme.error,
+    marginBottom: 10,
+  },
+  socialHint: {
+    fontFamily: fonts.sansRegular,
+    fontSize: 13,
+    color: theme.textMuted,
+    marginBottom: 8,
+  },
+  reactionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 8,
+  },
+  reactionBtn: {
+    minWidth: 72,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    backgroundColor: theme.cardBg,
+    alignItems: 'center',
+    gap: 4,
+  },
+  reactionBtnMine: {
+    borderColor: theme.accentDusk,
+    backgroundColor: 'rgba(201, 75, 106, 0.08)',
+  },
+  reactionBtnDisabled: { opacity: 0.55 },
+  reactionCount: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 13,
+    color: theme.textSecondary,
+  },
+  reactionCountMine: { color: theme.accentDusk },
+  commentsHeading: { marginTop: 20 },
+  noComments: {
+    fontFamily: fonts.sansRegular,
+    fontSize: 15,
+    color: theme.textMuted,
+    marginBottom: 12,
+  },
+  commentList: { gap: 12, marginBottom: 14 },
+  commentCard: {
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    backgroundColor: theme.cardBg,
+  },
+  commentHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    gap: 8,
+    marginBottom: 6,
+  },
+  commentAuthor: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 14,
+    color: theme.textPrimary,
+    flex: 1,
+  },
+  commentTime: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 12,
+    color: theme.textMuted,
+  },
+  commentBody: {
+    fontFamily: fonts.sansRegular,
+    fontSize: 15,
+    lineHeight: 22,
+    color: theme.textPrimary,
+  },
+  commentDelete: { alignSelf: 'flex-start', marginTop: 8 },
+  commentDeleteText: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 13,
+    color: theme.textSecondary,
+  },
+  commentComposer: { gap: 10, marginTop: 4 },
+  commentInput: {
+    minHeight: 88,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(47, 47, 47, 0.12)',
+    backgroundColor: theme.cardBg,
+    fontFamily: fonts.sansRegular,
+    fontSize: 16,
+    color: theme.textPrimary,
+  },
+  commentPostBtn: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: theme.accentGolden,
+  },
+  commentPostBtnDisabled: { opacity: 0.55 },
+  commentPostBtnText: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 15,
+    color: theme.textPrimary,
+  },
 });

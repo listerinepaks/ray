@@ -267,7 +267,7 @@ function App() {
         <Route path="/people/:id" element={<PersonProfile />} />
         <Route path="/moments/new" element={<CreateMoment currentUser={user} />} />
         <Route path="/moments/:id/edit" element={<CreateMoment currentUser={user} />} />
-        <Route path="/moments/:id" element={<EntryView />} />
+        <Route path="/moments/:id" element={<EntryView currentUser={user} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 

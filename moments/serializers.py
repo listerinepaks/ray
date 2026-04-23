@@ -312,14 +312,18 @@ class FriendshipRequestSerializer(serializers.Serializer):
 
 
 class CommentSerializer(serializers.ModelSerializer):
+    author_username = serializers.CharField(source="author.username", read_only=True)
+
     class Meta:
         model = Comment
-        fields = ["id", "moment", "author", "text", "created_at", "updated_at"]
+        fields = ["id", "moment", "author", "author_username", "text", "created_at", "updated_at"]
         read_only_fields = ["id", "moment", "author", "created_at", "updated_at"]
 
 
 class ReactionSerializer(serializers.ModelSerializer):
+    user_username = serializers.CharField(source="user.username", read_only=True)
+
     class Meta:
         model = Reaction
-        fields = ["id", "moment", "user", "type", "created_at"]
+        fields = ["id", "moment", "user", "user_username", "type", "created_at"]
         read_only_fields = ["id", "moment", "user", "created_at"]
