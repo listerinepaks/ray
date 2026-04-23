@@ -3,7 +3,9 @@ version: "3"
 vars:
   VENV_BIN:
     sh: |
-      if [ -x ".venv/bin/python" ]; then
+      if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "${VIRTUAL_ENV}/bin/python" ]; then
+        echo "${VIRTUAL_ENV}/bin"
+      elif [ -x ".venv/bin/python" ]; then
         echo ".venv/bin"
       elif [ -x "venv/bin/python" ]; then
         echo "venv/bin"
@@ -65,10 +67,9 @@ tasks:
     desc: Upgrade production app in /opt/ray (run on server)
     cmds:
       - cd /opt/ray && git pull
-      - cd /opt/ray && source .venv/bin/activate && set -a && source /opt/ray/.env && set +a
-      - cd /opt/ray && pip install -e ".[prod]"
-      - cd /opt/ray && python manage.py migrate
-      - cd /opt/ray && python manage.py collectstatic --noinput
+      - cd /opt/ray && set -a && source /opt/ray/.env && set +a && {{.VENV_BIN}}/pip install -e ".[prod]"
+      - cd /opt/ray && set -a && source /opt/ray/.env && set +a && {{.VENV_BIN}}/python manage.py migrate
+      - cd /opt/ray && set -a && source /opt/ray/.env && set +a && {{.VENV_BIN}}/python manage.py collectstatic --noinput
       - cd /opt/ray/ray-web && npm ci && npm run build
       - sudo supervisorctl restart ray
       - sudo nginx -t && sudo systemctl reload nginx
