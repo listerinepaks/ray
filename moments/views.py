@@ -176,6 +176,8 @@ class MomentViewSet(ModelViewSet):
                 author_avatar=Subquery(author_avatar_sq),
             )
             .distinct()
+            # distinct()+joins can drop Meta.ordering; keep feed newest-first (matches Moment.Meta).
+            .order_by("-date", "-observed_at", "-created_at", "-id")
         )
 
     def perform_create(self, serializer):

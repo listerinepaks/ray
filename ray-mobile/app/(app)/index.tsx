@@ -5,6 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'reac
 import {
   ActivityIndicator,
   Image,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -444,6 +445,16 @@ export default function TimelineScreen() {
   );
 }
 
+const timelineCardShadow = Platform.select({
+  web: { boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)' },
+  default: {
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+  },
+});
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.bgPrimary },
   root: { flex: 1, backgroundColor: theme.bgPrimary },
@@ -532,10 +543,7 @@ const styles = StyleSheet.create({
     borderColor: theme.cardBorder,
     backgroundColor: theme.cardBg,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
+    ...timelineCardShadow,
   },
   cardPoster: {
     flexDirection: 'row',

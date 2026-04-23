@@ -140,6 +140,16 @@ export default function LoginScreen() {
   );
 }
 
+const primaryBtnShadow = Platform.select({
+  web: { boxShadow: '0 1px 2px rgba(0, 0, 0, 0.06)' },
+  default: {
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+  },
+});
+
 const styles = StyleSheet.create({
   scroll: {
     maxWidth: 400,
@@ -174,10 +184,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
+    ...primaryBtnShadow,
   },
   primaryBtnDisabled: { opacity: 0.65 },
   primaryBtnText: {
