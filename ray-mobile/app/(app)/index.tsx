@@ -318,11 +318,29 @@ export default function TimelineScreen() {
           const thumb = photos.length
             ? [...photos].sort((a, b) => a.sort_order - b.sort_order)[0]
             : null;
+          const commentCount = m.comments_count ?? 0;
+          const reactionCount = m.reactions_count ?? 0;
+          const posterName = m.author_username ?? `user_${m.author}`;
+          const posterAvatarUri = m.author_avatar ? mediaUrl(m.author_avatar) : '';
           return (
             <Pressable
               key={m.id}
               onPress={() => router.push(`/moment/${m.id}`)}
               style={({ pressed }) => [styles.card, pressed && { opacity: 0.98 }]}>
+              <View style={styles.cardPoster}>
+                {posterAvatarUri ? (
+                  <Image source={{ uri: posterAvatarUri }} style={styles.cardPosterAvatar} />
+                ) : (
+                  <View style={styles.cardPosterAvatarFallback}>
+                    <Text style={styles.cardPosterAvatarLetter}>
+                      {posterName.slice(0, 1).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                <Text style={styles.cardPosterName} numberOfLines={1}>
+                  {posterName}
+                </Text>
+              </View>
               {thumb ? (
                 <View style={styles.thumbWrap}>
                   <AspectFitImage uri={mediaUrl(thumb.image)} />
@@ -375,6 +393,17 @@ export default function TimelineScreen() {
                     {truncateWords(m.reflection, LIST_REFLECTION_MAX_WORDS)}
                   </Text>
                 ) : null}
+                <View style={styles.cardSocial} accessibilityLabel={`${commentCount} comments, ${reactionCount} reactions`}>
+                  <Ionicons name="chatbubble-outline" size={15} color={theme.textMuted} />
+                  <Text style={styles.cardSocialText}>{commentCount}</Text>
+                  <Ionicons
+                    name="heart-outline"
+                    size={15}
+                    color={theme.textMuted}
+                    style={styles.cardSocialIconSecond}
+                  />
+                  <Text style={styles.cardSocialText}>{reactionCount}</Text>
+                </View>
               </View>
             </Pressable>
           );
@@ -508,6 +537,43 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 },
   },
+  cardPoster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(47, 47, 47, 0.1)',
+  },
+  cardPosterAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.bgSecondary,
+  },
+  cardPosterAvatarFallback: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.bgSecondary,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardPosterAvatarLetter: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 15,
+    color: theme.textPrimary,
+  },
+  cardPosterName: {
+    flex: 1,
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 15,
+    color: theme.textPrimary,
+  },
   /** Full width; height comes from image aspect ratio (portrait = taller). */
   thumbWrap: {
     width: '100%',
@@ -598,6 +664,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     color: theme.textPrimary,
+  },
+  cardSocial: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  cardSocialIconSecond: { marginLeft: 6 },
+  cardSocialText: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 13,
+    color: theme.textMuted,
   },
   feedTabs: {
     position: 'absolute',

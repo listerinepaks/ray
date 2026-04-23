@@ -132,6 +132,10 @@ class MomentSerializer(serializers.ModelSerializer):
     tagged_people = serializers.SerializerMethodField()
     access_list = serializers.SerializerMethodField()
     my_access = serializers.SerializerMethodField()
+    comments_count = serializers.SerializerMethodField()
+    reactions_count = serializers.SerializerMethodField()
+    author_username = serializers.CharField(source="author.username", read_only=True)
+    author_avatar = serializers.SerializerMethodField()
 
     people = MomentPersonWriteSerializer(many=True, write_only=True, required=False)
     access = MomentAccessWriteSerializer(many=True, write_only=True, required=False)
@@ -141,6 +145,8 @@ class MomentSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "author",
+            "author_username",
+            "author_avatar",
             "kind",
             "date",
             "observed_at",
@@ -155,12 +161,39 @@ class MomentSerializer(serializers.ModelSerializer):
             "access_list",
             "my_access",
             "tagged_people",
+            "comments_count",
+            "reactions_count",
             "people",
             "access",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "author", "created_at", "updated_at"]
+
+    def get_author_avatar(self, obj):
+        path = getattr(obj, "author_avatar", None)
+        if path:
+            return path
+        linked = (
+            Person.objects.filter(linked_user_id=obj.author_id)
+            .exclude(profile_photo="")
+            .order_by("id")
+            .values_list("profile_photo", flat=True)
+            .first()
+        )
+        return linked or None
+
+    def get_comments_count(self, obj):
+        c = getattr(obj, "comments_count", None)
+        if c is not None:
+            return c
+        return obj.comments.count()
+
+    def get_reactions_count(self, obj):
+        c = getattr(obj, "reactions_count", None)
+        if c is not None:
+            return c
+        return obj.reactions.count()
 
     def get_my_access(self, obj):
         return get_moment_access_level(self.context["request"].user, obj)

@@ -48,9 +48,27 @@ export function Timeline({ moments, loading, error }: Props) {
           const thumb = photos.length
             ? [...photos].sort((a, b) => a.sort_order - b.sort_order)[0]
             : null
+          const posterName = m.author_username ?? `user_${m.author}`
+          const posterAvatar = m.author_avatar ? mediaUrl(m.author_avatar) : ''
           return (
             <li key={m.id}>
               <Link className="moment-card" to={`/moments/${m.id}`}>
+                <div className="moment-card-poster">
+                  {posterAvatar ? (
+                    <img
+                      src={posterAvatar}
+                      alt=""
+                      className="moment-card-poster-avatar"
+                      width={36}
+                      height={36}
+                    />
+                  ) : (
+                    <span className="moment-card-poster-avatar moment-card-poster-avatar--fallback" aria-hidden>
+                      {posterName.slice(0, 1).toUpperCase()}
+                    </span>
+                  )}
+                  <span className="moment-card-poster-name">{posterName}</span>
+                </div>
                 {thumb ? (
                   <div className="moment-card-thumb">
                     <AspectFitImage
@@ -99,6 +117,19 @@ export function Timeline({ moments, loading, error }: Props) {
                       {truncateWords(m.reflection, LIST_REFLECTION_MAX_WORDS)}
                     </p>
                   ) : null}
+                  <div
+                    className="moment-card-activity"
+                    aria-label={`${m.comments_count ?? 0} comments, ${m.reactions_count ?? 0} reactions`}
+                  >
+                    <span className="moment-card-activity-item" aria-hidden>
+                      <span className="moment-card-activity-icon">💬</span>
+                      <span className="moment-card-activity-count">{m.comments_count ?? 0}</span>
+                    </span>
+                    <span className="moment-card-activity-item" aria-hidden>
+                      <span className="moment-card-activity-icon">❤️</span>
+                      <span className="moment-card-activity-count">{m.reactions_count ?? 0}</span>
+                    </span>
+                  </div>
                 </div>
               </Link>
             </li>

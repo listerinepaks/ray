@@ -190,6 +190,9 @@ export type TaggedPerson = {
 export type Moment = {
   id: number
   author: number
+  author_username?: string
+  /** Relative media path when author has a linked Person with a profile photo */
+  author_avatar?: string | null
   kind: string
   date: string
   observed_at: string | null
@@ -204,6 +207,9 @@ export type Moment = {
   tagged_people: TaggedPerson[]
   access_list?: { user_id: number; access_level: string }[]
   my_access: string | null
+  /** From list/detail API; may be omitted on older responses. */
+  comments_count?: number
+  reactions_count?: number
   created_at: string
   updated_at: string
 }

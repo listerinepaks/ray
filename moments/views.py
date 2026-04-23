@@ -1,4 +1,5 @@
 from django.db import IntegrityError
+from django.db.models import Count, OuterRef, Subquery
 from django.http import Http404
 from django.contrib.auth import get_user_model
 from rest_framework import status
@@ -159,10 +160,21 @@ class MomentViewSet(ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        author_avatar_sq = (
+            Person.objects.filter(linked_user_id=OuterRef("author_id"))
+            .exclude(profile_photo="")
+            .order_by("id")
+            .values("profile_photo")[:1]
+        )
         return (
             Moment.objects.filter(access_list__user=user)
             .select_related("author")
             .prefetch_related("photos", "people__person", "access_list")
+            .annotate(
+                comments_count=Count("comments", distinct=True),
+                reactions_count=Count("reactions", distinct=True),
+                author_avatar=Subquery(author_avatar_sq),
+            )
             .distinct()
         )
 

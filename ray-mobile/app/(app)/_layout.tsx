@@ -36,7 +36,14 @@ export default function AppGroupLayout() {
           contentStyle: { backgroundColor: theme.bgPrimary },
           headerShadowVisible: false,
         }}>
-        <Stack.Screen name="index" options={{ title: 'Ray' }} />
+        <Stack.Screen
+          name="index"
+          options={{
+            title: 'Ray',
+            /** Avoid “Ray” in the iOS back chip on pushed screens (e.g. moment detail). */
+            headerBackTitle: '',
+          }}
+        />
         <Stack.Screen name="profile" options={{ title: 'Profile' }} />
         <Stack.Screen name="friends" options={{ title: 'Friends' }} />
         <Stack.Screen name="profile/[id]" options={{ title: 'Profile' }} />

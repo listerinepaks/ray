@@ -13,7 +13,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AspectFitImage } from '@/components/AspectFitImage';
-import { RayLogo } from '@/components/RayLogo';
 import { useAuth } from '@/contexts/AuthContext';
 import { fonts, theme } from '@/constants/theme';
 import { formatSmartDate } from '@/lib/formatSmartDate';
@@ -252,27 +251,23 @@ export default function MomentEntryScreen() {
       style={styles.root}
       contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 28) }}>
       <View style={styles.pad}>
-        <Pressable onPress={() => router.push('/')} accessibilityRole="link">
-          <RayLogo />
-        </Pressable>
-
-        <View style={styles.nav}>
-          <Pressable onPress={() => router.push('/')} hitSlop={12}>
-            <Text style={styles.back}>← All moments</Text>
-          </Pressable>
-          <View style={styles.navRight}>
-            {moment.my_access === 'edit' ? (
-              <Pressable onPress={() => router.push(`/moment/edit/${moment.id}`)} hitSlop={8}>
-                <Text style={styles.navAction}>Edit moment</Text>
-              </Pressable>
-            ) : null}
-            {moment.my_access ? (
-              <View style={styles.accessPill}>
-                <Text style={styles.accessPillText}>{moment.my_access}</Text>
-              </View>
-            ) : null}
+        {(moment.my_access === 'edit' || moment.my_access) ? (
+          <View style={styles.nav}>
+            <View style={styles.navSpacer} />
+            <View style={styles.navRight}>
+              {moment.my_access === 'edit' ? (
+                <Pressable onPress={() => router.push(`/moment/edit/${moment.id}`)} hitSlop={8}>
+                  <Text style={styles.navAction}>Edit moment</Text>
+                </Pressable>
+              ) : null}
+              {moment.my_access ? (
+                <View style={styles.accessPill}>
+                  <Text style={styles.accessPillText}>{moment.my_access}</Text>
+                </View>
+              ) : null}
+            </View>
           </View>
-        </View>
+        ) : null}
 
         {hero ? (
           <View style={styles.hero}>
@@ -480,14 +475,14 @@ const styles = StyleSheet.create({
   },
   nav: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: 12,
-    marginTop: 12,
-    marginBottom: 16,
+    marginTop: 4,
+    marginBottom: 12,
   },
-  back: { fontFamily: fonts.sansSemiBold, fontSize: 16, color: theme.textSecondary },
-  navRight: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center', maxWidth: '58%' },
+  navSpacer: { flex: 1 },
+  navRight: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'flex-end' },
   navAction: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: theme.textSecondary },
   accessPill: {
     paddingHorizontal: 10,
