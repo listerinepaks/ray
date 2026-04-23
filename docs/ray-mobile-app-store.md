@@ -111,3 +111,12 @@ After changing icons/splash paths in `app.json`, run a fresh native project gene
 cd ray-mobile
 npx expo prebuild --clean
 ```
+
+Before archiving in Xcode, sync native iOS version fields from `app-version.json`:
+
+```bash
+cd ray-mobile
+npm run prearchive:ios
+```
+
+This updates `CFBundleVersion` / `CURRENT_PROJECT_VERSION` so Archive uses `iosBuildNumber`.

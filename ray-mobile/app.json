@@ -16,7 +16,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Ray uses your location to show today's sunrise and sunset times."
+        "NSLocationWhenInUseUsageDescription": "Ray uses your location to show today's sunrise and sunset times.",
+        "ITSAppUsesNonExemptEncryption": false
       },
       "bundleIdentifier": "com.listerinepaks.raymobile"
     },

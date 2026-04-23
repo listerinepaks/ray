@@ -3,9 +3,11 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
+    "sync:version": "node ./scripts/sync-native-version.mjs",
     "start": "expo start",
     "android": "expo run:android",
-    "ios": "expo run:ios",
+    "ios": "npm run sync:version && expo run:ios",
+    "prearchive:ios": "npm run sync:version",
     "web": "expo start --web"
   },
   "dependencies": {

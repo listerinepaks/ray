@@ -88,7 +88,9 @@ export async function postTokenLogin(username: string, password: string): Promis
   const base = getApiBase();
   const res = await fetch(`${base}/api/auth/token/`, {
     method: 'POST',
-    headers: { ...baseHeaders(true) },
+    // Do not send an existing Authorization token when requesting a new token.
+    // DRF may reject bad/stale auth headers before this AllowAny view runs.
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
   if (!res.ok) throw new Error(await parseErrorBody(res));
