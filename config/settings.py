@@ -21,6 +21,8 @@ if SENTRY_DSN:
         send_default_pii=False,
     )
 
+SENTRY_TRIGGER_ENABLED = os.environ.get("SENTRY_TRIGGER_ENABLED", "1" if DEBUG else "0") == "1"
+
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-only-secret-key")
 if not DEBUG:
     if not SECRET_KEY or SECRET_KEY == "dev-only-secret-key":

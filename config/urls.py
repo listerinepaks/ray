@@ -26,6 +26,7 @@ router.register("people", PersonViewSet, basename="person")
 
 urlpatterns = [
     path("", config_views.root, name="root"),
+    path("api/debug/sentry/", config_views.sentry_trigger, name="sentry-trigger"),
     path("admin/", admin.site.urls),
     path("api/auth/csrf/", auth_views.auth_csrf),
     path("api/auth/login/", auth_views.auth_login),

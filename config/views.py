@@ -1,4 +1,5 @@
-from django.http import HttpResponse
+from django.conf import settings
+from django.http import Http404, HttpResponse
 
 
 def root(request):
@@ -28,3 +29,10 @@ def root(request):
 </body>
 </html>"""
     return HttpResponse(html)
+
+
+def sentry_trigger(request):
+    if not settings.SENTRY_TRIGGER_ENABLED:
+        raise Http404
+    # Intentional exception endpoint for validating Sentry ingestion.
+    _ = 1 / 0
