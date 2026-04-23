@@ -6,6 +6,7 @@
 |--------|--------|
 | **Name** | Ray Mobile |
 | **SKU** | `raymobile` |
+| **App Category** | Lifestyle |
 
 ## App name (App Store Connect)
 
