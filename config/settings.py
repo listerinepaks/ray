@@ -1,11 +1,25 @@
 import os
 from pathlib import Path
+import importlib
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Dev default True; production: set DJANGO_DEBUG=0
 DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
+
+SENTRY_DSN = os.environ.get("SENTRY_DSN", "").strip()
+if SENTRY_DSN:
+    sentry_sdk = importlib.import_module("sentry_sdk")
+    django_integration_mod = importlib.import_module("sentry_sdk.integrations.django")
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[django_integration_mod.DjangoIntegration()],
+        environment=os.environ.get("SENTRY_ENVIRONMENT", "development" if DEBUG else "production"),
+        traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0")),
+        profiles_sample_rate=float(os.environ.get("SENTRY_PROFILES_SAMPLE_RATE", "0")),
+        send_default_pii=False,
+    )
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-only-secret-key")
 if not DEBUG:
