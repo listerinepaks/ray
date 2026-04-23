@@ -56,6 +56,40 @@ tasks:
     cmds:
       - npm run build
 
+  env:where:
+    desc: Show whether this is local iOS build machine or remote server
+    cmds:
+      - |
+        if [ "$(uname -s)" = "Darwin" ]; then
+          echo "Environment: local macOS (likely iOS build machine)"
+        else
+          echo "Environment: non-macOS ($(uname -s)) (likely remote/server)"
+        fi
+      - |
+        if [ -d "/opt/ray" ]; then
+          echo "Detected /opt/ray -> production-style server layout present"
+        else
+          echo "No /opt/ray detected"
+        fi
+      - |
+        if command -v xcodebuild >/dev/null 2>&1; then
+          echo "xcodebuild found"
+        else
+          echo "xcodebuild not found"
+        fi
+
+  mobile:prebuild:ios:
+    desc: Sync app versions and regenerate iOS native project
+    dir: ray-mobile
+    preconditions:
+      - sh: '[ "$(uname -s)" = "Darwin" ]'
+        msg: "mobile:prebuild:ios must run on macOS (local iOS build machine)."
+      - sh: "command -v xcodebuild >/dev/null 2>&1"
+        msg: "xcodebuild not found; run on your local Mac with Xcode installed."
+    cmds:
+      - npm run sync:version
+      - npx expo prebuild --platform ios
+
   verify:
     desc: Run core verification checks (api + web + mobile)
     cmds:

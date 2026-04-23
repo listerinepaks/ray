@@ -414,16 +414,28 @@ export default function TimelineScreen() {
       <View style={[styles.feedTabs, { paddingBottom: Math.max(insets.bottom, 10) }]}>
         <Pressable
           onPress={() => setFeedTab('all')}
+          accessibilityRole="tab"
+          accessibilityLabel="All moments"
+          accessibilityState={{ selected: feedTab === 'all' }}
           style={[styles.feedTabBtn, feedTab === 'all' && styles.feedTabBtnOn]}>
-          <Text style={[styles.feedTabText, feedTab === 'all' && styles.feedTabTextOn]}>All</Text>
+          <Ionicons
+            name="albums-outline"
+            size={18}
+            color={feedTab === 'all' ? theme.textPrimary : theme.textSecondary}
+          />
         </Pressable>
         <Pressable
           onPress={() => setFeedTab('friends')}
+          accessibilityRole="tab"
+          accessibilityLabel="Friends moments"
+          accessibilityState={{ selected: feedTab === 'friends' }}
           style={[styles.feedTabBtn, feedTab === 'friends' && styles.feedTabBtnOn]}>
           <View style={styles.feedTabInner}>
-            <Text style={[styles.feedTabText, feedTab === 'friends' && styles.feedTabTextOn]}>
-              Friends
-            </Text>
+            <Ionicons
+              name="people-outline"
+              size={18}
+              color={feedTab === 'friends' ? theme.textPrimary : theme.textSecondary}
+            />
             {pendingIncoming.length > 0 ? (
               <View style={styles.feedTabBadge} accessibilityLabel={`${pendingIncoming.length} pending friend requests`}>
                 <Text style={styles.feedTabBadgeText}>
@@ -435,10 +447,15 @@ export default function TimelineScreen() {
         </Pressable>
         <Pressable
           onPress={() => setFeedTab('mentions')}
+          accessibilityRole="tab"
+          accessibilityLabel="Mentioned moments"
+          accessibilityState={{ selected: feedTab === 'mentions' }}
           style={[styles.feedTabBtn, feedTab === 'mentions' && styles.feedTabBtnOn]}>
-          <Text style={[styles.feedTabText, feedTab === 'mentions' && styles.feedTabTextOn]}>
-            Mentions
-          </Text>
+          <Ionicons
+            name="at-outline"
+            size={18}
+            color={feedTab === 'mentions' ? theme.textPrimary : theme.textSecondary}
+          />
         </Pressable>
       </View>
     </View>
