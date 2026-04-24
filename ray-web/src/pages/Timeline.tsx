@@ -7,6 +7,7 @@ import {
   LIST_REFLECTION_MAX_WORDS,
   truncateWords,
 } from '../truncateWords'
+import { SparklesIcon } from '../components/SparklesIcon'
 import { mediaUrl, type Moment } from '../api'
 
 export type LookingAheadSummary = {
@@ -149,7 +150,14 @@ export function Timeline({
                     <div className="moment-card-poster-row">
                       <span className="moment-card-poster-name">{posterName}</span>
                       {m.moment_type === 'looking_ahead' ? (
-                        <span className="moment-card-looking-label">Looking ahead</span>
+                        <span className="moment-card-looking-label">
+                          <SparklesIcon
+                            className="moment-card-looking-label-icon"
+                            variant="solid"
+                            size={11}
+                          />
+                          Looking ahead
+                        </span>
                       ) : null}
                     </div>
                   </div>

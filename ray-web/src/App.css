@@ -827,7 +827,10 @@
 }
 
 .moment-card-looking-label {
+  display: inline-flex;
   flex: 0 0 auto;
+  align-items: center;
+  gap: 0.28rem;
   font-size: 0.6rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -837,6 +840,11 @@
   padding: 0.15rem 0.4rem;
   border-radius: 6px;
   white-space: nowrap;
+}
+
+.moment-card-looking-label-icon {
+  flex-shrink: 0;
+  opacity: 0.92;
 }
 
 .moment-card-poster-main {

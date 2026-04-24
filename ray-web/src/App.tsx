@@ -15,6 +15,7 @@ import {
   type Profile as ProfileType,
 } from './api'
 import { RayLogo } from './components/RayLogo'
+import { SparklesIcon } from './components/SparklesIcon'
 import { CreateMoment } from './pages/CreateMoment'
 import { EntryView } from './pages/EntryView'
 import { PersonProfile } from './pages/PersonProfile'
@@ -376,7 +377,7 @@ function App() {
           </button>
           {/*
             Icon alternatives: hourglass (pending), calendar (date), telescope (gaze), flag (milestone).
-            Mobile uses sparkles-outline in ray-mobile/app/(app)/index.tsx.
+            Mobile uses Ionicons sparkles (filled) in ray-mobile/app/(app)/index.tsx.
           */}
           <button
             type="button"
@@ -385,16 +386,7 @@ function App() {
             aria-label="Looking ahead moments"
             onClick={() => setFeedTab('looking_ahead')}
           >
-            <svg className="feed-tab-icon" width={20} height={20} viewBox="0 0 24 24" aria-hidden>
-              <path
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 4.5L12 7.5M12 16.5L12 19.5M5.5 12L8.5 12M15.5 12L18.5 12M6.7 6.7L8.95 8.95M15.05 15.05L17.3 17.3M17.3 6.7L15.05 8.95M8.95 15.05L6.7 17.3M18.5 5.5v2.5M17.25 6.75h2.5M5.5 17.5v2.5M4.25 18.75h2.5"
-              />
-            </svg>
+            <SparklesIcon className="feed-tab-icon" variant="outline" size={20} />
             <span className="sr-only">Looking ahead</span>
           </button>
           <button

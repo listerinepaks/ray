@@ -435,6 +435,7 @@ export default function TimelineScreen() {
                     </Text>
                     {m.moment_type === 'looking_ahead' ? (
                       <View style={styles.lookingLabelInline} accessibilityLabel="Looking ahead">
+                        <Ionicons name="sparkles" size={11} color={theme.textSecondary} />
                         <Text style={styles.lookingLabelInlineText}>Looking ahead</Text>
                       </View>
                     ) : null}
@@ -535,11 +536,10 @@ export default function TimelineScreen() {
           accessibilityState={{ selected: feedTab === 'looking_ahead' }}
           style={[styles.feedTabBtn, feedTab === 'looking_ahead' && styles.feedTabBtnOn]}>
           {/*
-            Icon alternatives (Ionicons): hourglass-outline (pending), calendar-outline (future date),
-            telescope-outline (forward gaze), flag-outline (milestone), navigate-outline (journey).
+            Icon alternatives (Ionicons): sparkles-outline, hourglass-outline (pending), calendar-outline.
           */}
           <Ionicons
-            name="sparkles-outline"
+            name="sparkles"
             size={17}
             color={feedTab === 'looking_ahead' ? theme.textPrimary : theme.textSecondary}
           />
@@ -788,7 +788,10 @@ const styles = StyleSheet.create({
   /** Inline “Looking ahead” pill beside author name (timeline poster row). */
   lookingLabelInline: {
     flexShrink: 0,
-    paddingHorizontal: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
     paddingVertical: 3,
     borderRadius: 6,
     backgroundColor: 'rgba(242, 169, 123, 0.42)',

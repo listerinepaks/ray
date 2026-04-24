@@ -307,7 +307,7 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsMultipleSelection: true,
       exif: true,
       quality: 0.88,
