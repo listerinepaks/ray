@@ -168,6 +168,8 @@ export type TaggedPerson = {
 export type Moment = {
   id: number;
   author: number;
+  /** Person id for author profile route (`/profile/:personId`) when available. */
+  author_person_id?: number | null;
   author_username?: string;
   /** Relative media path when author has a linked Person with a profile photo */
   author_avatar?: string | null;
