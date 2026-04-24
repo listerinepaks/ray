@@ -139,6 +139,7 @@ class MomentSerializer(serializers.ModelSerializer):
     comments_count = serializers.SerializerMethodField()
     reactions_count = serializers.SerializerMethodField()
     author_username = serializers.CharField(source="author.username", read_only=True)
+    author_person_id = serializers.SerializerMethodField()
     author_avatar = serializers.SerializerMethodField()
     countdown_phrase = serializers.SerializerMethodField()
 
@@ -151,6 +152,7 @@ class MomentSerializer(serializers.ModelSerializer):
             "id",
             "author",
             "author_username",
+            "author_person_id",
             "author_avatar",
             "moment_type",
             "countdown_phrase",
@@ -215,6 +217,15 @@ class MomentSerializer(serializers.ModelSerializer):
         if request:
             return request.build_absolute_uri(url)
         return url
+
+    def get_author_person_id(self, obj):
+        p = (
+            Person.objects.filter(linked_user_id=obj.author_id)
+            .order_by("id")
+            .only("id")
+            .first()
+        )
+        return p.id if p else None
 
     def get_comments_count(self, obj):
         c = getattr(obj, "comments_count", None)

@@ -373,12 +373,10 @@ export default function MomentEntryScreen() {
   const posterName = moment.author_username ?? `user_${moment.author}`;
   const posterAvatarUri = moment.author_avatar ? mediaUrl(moment.author_avatar) : '';
   const isSelfMoment = currentUser != null && moment.author === currentUser.id;
-  const authorPersonId = moment.author_person_id ?? null;
+  const authorRouteId = moment.author_person_id ?? moment.author;
   const profileHref = isSelfMoment
     ? '/profile'
-    : authorPersonId != null
-      ? `/profile/${authorPersonId}`
-      : null;
+    : `/profile/${authorRouteId}`;
 
   return (
     <KeyboardAvoidingView
@@ -391,10 +389,7 @@ export default function MomentEntryScreen() {
         keyboardShouldPersistTaps="handled">
         <View style={styles.pad}>
         <Pressable
-          onPress={() => {
-            if (profileHref) router.push(profileHref);
-          }}
-          disabled={!profileHref}
+          onPress={() => router.push(profileHref)}
           style={({ pressed }) => [styles.detailPoster, pressed && { opacity: 0.92 }]}>
           {posterAvatarUri ? (
             <Image source={{ uri: posterAvatarUri }} style={styles.detailPosterAvatar} />

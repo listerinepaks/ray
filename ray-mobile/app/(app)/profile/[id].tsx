@@ -4,7 +4,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { fonts, theme } from '@/constants/theme';
-import { fetchProfileByPerson, mediaUrl, type Profile } from '@/lib/api';
+import { fetchPeople, fetchProfileByPerson, mediaUrl, type Profile } from '@/lib/api';
 
 export default function PersonProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -30,7 +30,17 @@ export default function PersonProfileScreen() {
       try {
         setLoading(true);
         setError(null);
-        const data = await fetchProfileByPerson(id);
+        let data: Profile;
+        try {
+          // Primary path: id is person id.
+          data = await fetchProfileByPerson(id);
+        } catch {
+          // Fallback path: id may actually be user id; map user -> person.
+          const people = await fetchPeople();
+          const person = people.find((p) => p.linked_user === id);
+          if (!person) throw new Error('Could not find this profile.');
+          data = await fetchProfileByPerson(person.id);
+        }
         if (!cancelled) setProfile(data);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load profile.');
