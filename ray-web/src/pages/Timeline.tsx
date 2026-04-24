@@ -9,20 +9,37 @@ import {
 } from '../truncateWords'
 import { mediaUrl, type Moment } from '../api'
 
+export type LookingAheadSummary = {
+  preview: Moment[]
+  total: number
+}
+
 type Props = {
   moments: Moment[]
   loading: boolean
   error: string | null
   /** When the feed filter has no rows (e.g. Friends) — show this instead of the empty-state hero. */
   emptyHint?: string | null
+  /** On the All feed: compact block for upcoming looking-ahead moments (main list excludes them). */
+  lookingAheadSummary?: LookingAheadSummary | null
+  onLookingAheadSeeAll?: () => void
 }
 
 function formatKindLabel(kind: string): string {
   return kind === 'sunrise' ? 'Sunrise' : kind === 'sunset' ? 'Sunset' : kind
 }
 
-export function Timeline({ moments, loading, error, emptyHint = null }: Props) {
-  const showEmptyHero = !loading && !error && moments.length === 0 && !emptyHint
+export function Timeline({
+  moments,
+  loading,
+  error,
+  emptyHint = null,
+  lookingAheadSummary = null,
+  onLookingAheadSeeAll,
+}: Props) {
+  const hasLaSummary = Boolean(lookingAheadSummary && lookingAheadSummary.total > 0)
+  const showEmptyHero =
+    !loading && !error && moments.length === 0 && !emptyHint && !hasLaSummary
 
   return (
     <>
@@ -46,6 +63,58 @@ export function Timeline({ moments, loading, error, emptyHint = null }: Props) {
 
       {!loading && !error && moments.length === 0 && emptyHint ? (
         <p className="muted timeline-tab-empty">{emptyHint}</p>
+      ) : null}
+
+      {!loading && !error && hasLaSummary && lookingAheadSummary ? (
+        <section className="la-summary" aria-label="Looking ahead">
+          <div className="la-summary-header">
+            <h2 className="la-summary-title">Looking ahead</h2>
+            <span className="la-summary-count">{lookingAheadSummary.total}</span>
+          </div>
+          <ul className="la-summary-rows">
+            {lookingAheadSummary.preview.map((m) => {
+              const posterName = m.author_username ?? `user_${m.author}`
+              const posterAvatar = m.author_avatar ? mediaUrl(m.author_avatar) : ''
+              const sub =
+                (m.countdown_phrase && m.countdown_phrase.trim()) || formatSmartDate(m.date)
+              return (
+                <li key={m.id}>
+                  <Link className="la-summary-row" to={`/moments/${m.id}`}>
+                    {posterAvatar ? (
+                      <img
+                        src={posterAvatar}
+                        alt=""
+                        className="la-summary-avatar"
+                        width={28}
+                        height={28}
+                      />
+                    ) : (
+                      <span className="la-summary-avatar la-summary-avatar--fallback" aria-hidden>
+                        {posterName.slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="la-summary-row-text">
+                      <span className="la-summary-name">{posterName}</span>
+                      <span className="la-summary-sub">{sub}</span>
+                    </span>
+                    <span className="la-summary-chevron" aria-hidden>
+                      ›
+                    </span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+          {lookingAheadSummary.total > 3 && onLookingAheadSeeAll ? (
+            <button type="button" className="la-summary-see-all" onClick={onLookingAheadSeeAll}>
+              See all
+            </button>
+          ) : null}
+        </section>
+      ) : null}
+
+      {!loading && !error && moments.length === 0 && hasLaSummary ? (
+        <p className="muted timeline-tab-empty">No other moments yet.</p>
       ) : null}
 
       <ul className="moments">

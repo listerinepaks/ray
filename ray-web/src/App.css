@@ -106,6 +106,133 @@
   margin: 0.5rem 0 1.25rem;
 }
 
+/* All-feed compact “Looking ahead” summary (soonest first; full cards live on Looking ahead tab). */
+.la-summary {
+  margin-bottom: 1.25rem;
+  border-radius: 14px;
+  border: 1px solid rgba(242, 169, 123, 0.52);
+  background: rgba(242, 169, 123, 0.12);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.la-summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem 0.5rem;
+  border-bottom: 1px solid rgba(242, 169, 123, 0.38);
+}
+
+.la-summary-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.la-summary-count {
+  min-width: 1.65rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-secondary);
+  background: rgba(242, 169, 123, 0.42);
+}
+
+.la-summary-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.la-summary-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid rgba(47, 47, 47, 0.08);
+  text-decoration: none;
+  color: inherit;
+}
+
+.la-summary-avatar {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--bg-secondary);
+}
+
+.la-summary-avatar--fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  border: 1px solid rgba(47, 47, 47, 0.12);
+}
+
+.la-summary-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.la-summary-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.la-summary-sub {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.la-summary-chevron {
+  flex-shrink: 0;
+  font-size: 1.15rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.la-summary-see-all {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: transparent;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--accent-peach);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.la-summary-see-all:hover {
+  opacity: 0.9;
+}
+
 .app--with-feed-tabs .floating-love-heart {
   bottom: max(5.75rem, calc(4.5rem + env(safe-area-inset-bottom)));
 }

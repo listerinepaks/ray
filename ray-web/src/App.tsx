@@ -116,7 +116,10 @@ function App() {
   const visibleMoments = useMemo(() => {
     if (!user) return []
     if (feedTab === 'looking_ahead') {
-      return moments.filter((m) => m.moment_type === 'looking_ahead')
+      return moments
+        .filter((m) => m.moment_type === 'looking_ahead')
+        .slice()
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     }
     if (feedTab === 'friends') return moments.filter((m) => friendUserIds.has(m.author))
     if (feedTab === 'mentions') {
@@ -130,6 +133,28 @@ function App() {
     }
     return moments
   }, [user, feedTab, friendUserIds, moments, profile?.person_id])
+
+  const lookingAheadSorted = useMemo(
+    () =>
+      moments
+        .filter((m) => m.moment_type === 'looking_ahead')
+        .slice()
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    [moments],
+  )
+
+  const momentsForTimeline = useMemo(() => {
+    if (!user || feedTab !== 'all') return visibleMoments
+    return visibleMoments.filter((m) => m.moment_type !== 'looking_ahead')
+  }, [user, feedTab, visibleMoments])
+
+  const lookingAheadSummary = useMemo(() => {
+    if (!user || feedTab !== 'all' || lookingAheadSorted.length === 0) return null
+    return {
+      preview: lookingAheadSorted.slice(0, 3),
+      total: lookingAheadSorted.length,
+    }
+  }, [user, feedTab, lookingAheadSorted])
 
   const feedEmptyHint = useMemo(() => {
     if (!user || loadingMoments || error) return null
@@ -315,10 +340,12 @@ function App() {
           path="/"
           element={
             <Timeline
-              moments={visibleMoments}
+              moments={momentsForTimeline}
               loading={loadingMoments}
               error={error}
               emptyHint={feedEmptyHint}
+              lookingAheadSummary={lookingAheadSummary}
+              onLookingAheadSeeAll={() => setFeedTab('looking_ahead')}
             />
           }
         />

@@ -185,7 +185,10 @@ export default function TimelineScreen() {
 
   const visibleMoments = useMemo(() => {
     if (feedTab === 'looking_ahead') {
-      return moments.filter((m) => m.moment_type === 'looking_ahead');
+      return moments
+        .filter((m) => m.moment_type === 'looking_ahead')
+        .slice()
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }
     if (feedTab === 'friends') return moments.filter((m) => friendUserIds.has(m.author));
     if (feedTab === 'mentions') {
@@ -199,6 +202,20 @@ export default function TimelineScreen() {
     }
     return moments;
   }, [feedTab, friendUserIds, moments, profile?.person_id, user?.id]);
+
+  const lookingAheadSorted = useMemo(
+    () =>
+      moments
+        .filter((m) => m.moment_type === 'looking_ahead')
+        .slice()
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    [moments],
+  );
+
+  const listMoments = useMemo(() => {
+    if (feedTab !== 'all') return visibleMoments;
+    return visibleMoments.filter((m) => m.moment_type !== 'looking_ahead');
+  }, [feedTab, visibleMoments]);
 
   return (
     <View style={styles.screen}>
@@ -306,7 +323,10 @@ export default function TimelineScreen() {
         </View>
       ) : null}
 
-      {!loading && !error && visibleMoments.length === 0 ? (
+      {!loading &&
+      !error &&
+      listMoments.length === 0 &&
+      !(feedTab === 'all' && lookingAheadSorted.length > 0) ? (
         <Text style={styles.muted}>
           {feedTab === 'looking_ahead'
             ? 'No looking-ahead moments yet.'
@@ -318,8 +338,65 @@ export default function TimelineScreen() {
         </Text>
       ) : null}
 
+      {!loading && !error && feedTab === 'all' && lookingAheadSorted.length > 0 ? (
+        <View
+          style={styles.laSummaryCard}
+          accessible
+          accessibilityLabel={`Looking ahead, ${lookingAheadSorted.length} total`}>
+          <View style={styles.laSummaryHeader}>
+            <Text style={styles.laSummaryTitle}>Looking ahead</Text>
+            <View style={styles.laSummaryCountPill}>
+              <Text style={styles.laSummaryCountText}>{lookingAheadSorted.length}</Text>
+            </View>
+          </View>
+          {lookingAheadSorted.slice(0, 3).map((m) => {
+            const laName = m.author_username ?? `user_${m.author}`;
+            const laAvatarUri = m.author_avatar ? mediaUrl(m.author_avatar) : '';
+            const laSub =
+              (m.countdown_phrase && m.countdown_phrase.trim()) || formatSmartDate(m.date);
+            return (
+              <Pressable
+                key={m.id}
+                onPress={() => router.push(`/moment/${m.id}`)}
+                style={({ pressed }) => [styles.laSummaryRow, pressed && { opacity: 0.88 }]}>
+                {laAvatarUri ? (
+                  <Image source={{ uri: laAvatarUri }} style={styles.laSummaryAvatar} />
+                ) : (
+                  <View style={styles.laSummaryAvatarFallback}>
+                    <Text style={styles.laSummaryAvatarLetter}>
+                      {laName.slice(0, 1).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.laSummaryRowMain}>
+                  <Text style={styles.laSummaryName} numberOfLines={1}>
+                    {laName}
+                  </Text>
+                  <Text style={styles.laSummarySub} numberOfLines={1}>
+                    {laSub}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
+              </Pressable>
+            );
+          })}
+          {lookingAheadSorted.length > 3 ? (
+            <Pressable
+              onPress={() => setFeedTab('looking_ahead')}
+              style={({ pressed }) => [styles.laSummarySeeAll, pressed && { opacity: 0.88 }]}>
+              <Text style={styles.laSummarySeeAllText}>See all</Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.accentPeach} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
+      {!loading && !error && feedTab === 'all' && listMoments.length === 0 && lookingAheadSorted.length > 0 ? (
+        <Text style={styles.muted}>No other moments yet.</Text>
+      ) : null}
+
       <View style={styles.list}>
-        {visibleMoments.map((m) => {
+        {listMoments.map((m) => {
           const photos = m.photos ?? [];
           const thumb = photos.length
             ? [...photos].sort((a, b) => a.sort_order - b.sort_order)[0]
@@ -597,6 +674,101 @@ const styles = StyleSheet.create({
     color: theme.textSecondary,
   },
   list: { gap: 18, paddingBottom: 8 },
+  laSummaryCard: {
+    marginBottom: 18,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(242, 169, 123, 0.52)',
+    backgroundColor: 'rgba(242, 169, 123, 0.12)',
+    overflow: 'hidden',
+    ...timelineCardShadow,
+  },
+  laSummaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(242, 169, 123, 0.38)',
+  },
+  laSummaryTitle: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 16,
+    color: theme.textPrimary,
+  },
+  laSummaryCountPill: {
+    minWidth: 26,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: 'rgba(242, 169, 123, 0.42)',
+    alignItems: 'center',
+  },
+  laSummaryCountText: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 13,
+    color: theme.textSecondary,
+  },
+  laSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(47, 47, 47, 0.08)',
+  },
+  laSummaryAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: theme.bgSecondary,
+  },
+  laSummaryAvatarFallback: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: theme.bgSecondary,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  laSummaryAvatarLetter: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 12,
+    color: theme.textPrimary,
+  },
+  laSummaryRowMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  laSummaryName: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 14,
+    color: theme.textPrimary,
+  },
+  laSummarySub: {
+    fontFamily: fonts.sansRegular,
+    fontSize: 12,
+    color: theme.textMuted,
+    marginTop: 2,
+  },
+  laSummarySeeAll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  laSummarySeeAllText: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 14,
+    color: theme.accentPeach,
+  },
   card: {
     borderRadius: 14,
     borderWidth: 1,
