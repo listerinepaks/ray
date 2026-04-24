@@ -56,6 +56,13 @@ export default function AppGroupLayout() {
         />
         <Stack.Screen name="moment/[id]" options={{ title: 'Moment' }} />
         <Stack.Screen
+          name="moment/share/[id]"
+          options={{
+            title: 'Take this with you',
+            headerBackTitle: '',
+          }}
+        />
+        <Stack.Screen
           name="moment/edit/[id]"
           options={{
             title: 'Edit moment',

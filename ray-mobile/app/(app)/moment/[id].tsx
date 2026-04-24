@@ -338,6 +338,11 @@ export default function MomentEntryScreen() {
                   <Text style={styles.navAction}>Edit moment</Text>
                 </Pressable>
               ) : null}
+              {moment.my_access === 'edit' ? (
+                <Pressable onPress={() => router.push(`/moment/share/${moment.id}`)} hitSlop={8}>
+                  <Text style={styles.navActionQuiet}>Take this with you</Text>
+                </Pressable>
+              ) : null}
               {moment.my_access ? (
                 <View style={styles.accessPill}>
                   <Text style={styles.accessPillText}>{moment.my_access}</Text>
@@ -599,6 +604,11 @@ const styles = StyleSheet.create({
   navSpacer: { flex: 1 },
   navRight: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'flex-end' },
   navAction: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: theme.textSecondary },
+  navActionQuiet: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 13,
+    color: theme.textMuted,
+  },
   convertNavBtn: { color: theme.accentPeach },
   accessPill: {
     paddingHorizontal: 10,
