@@ -56,6 +56,24 @@ function todayDateString(): string {
   return `${y}-${m}-${day}`
 }
 
+function parseDateInput(value: string): Date | null {
+  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return null
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0, 0)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+function calendarDateRelationToToday(dateStr: string): 'past' | 'today' | 'future' | 'invalid' {
+  const parsed = parseDateInput(dateStr)
+  if (!parsed) return 'invalid'
+  const today = new Date()
+  const a = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()).getTime()
+  const b = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+  if (a < b) return 'past'
+  if (a > b) return 'future'
+  return 'today'
+}
+
 function toDatetimeLocal(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
@@ -176,6 +194,14 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
       cancelled = true
     }
   }, [isEdit, editId, navigate])
+
+  /** New moments: future date → Looking ahead; past date → Past (matches API rules). */
+  useEffect(() => {
+    if (isEdit) return
+    const rel = calendarDateRelationToToday(date)
+    if (rel === 'future') setMomentType('looking_ahead')
+    else if (rel === 'past') setMomentType('past')
+  }, [isEdit, date])
 
   useEffect(() => {
     return () => {
@@ -447,6 +473,45 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
           ) : null}
           {uploadPhase ? <p className="create-upload-phase">{uploadPhase}</p> : null}
 
+          <section className="create-section" aria-labelledby="sec-moment-type">
+            <h2 id="sec-moment-type" className="create-section-title">
+              Something that happened — or you&apos;re looking forward to
+            </h2>
+            {isEdit && loadedMomentType === 'looking_ahead' ? (
+              <p className="create-moment-type-readonly">
+                <span className="looking-ahead-pill">Looking ahead</span> This entry is something you’re
+                planning together. When it happens, open it from the journal and choose{' '}
+                <strong>We lived this</strong> to turn it into a past moment.
+              </p>
+            ) : isEdit ? (
+              <p className="create-moment-type-readonly muted">Past moment</p>
+            ) : (
+              <div className="moment-type-grid" role="group" aria-label="Past or looking ahead">
+                <button
+                  type="button"
+                  className={`moment-type-card ${momentType === 'past' ? 'is-selected' : ''}`}
+                  onClick={() => setMomentType('past')}
+                >
+                  <span className="moment-type-card-title">Something we lived</span>
+                  <span className="moment-type-card-body">
+                    A sunrise, sunset, or moment that already happened — with photos and reflection.
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className={`moment-type-card ${momentType === 'looking_ahead' ? 'is-selected' : ''}`}
+                  onClick={() => setMomentType('looking_ahead')}
+                >
+                  <span className="moment-type-card-title">Something to look forward to</span>
+                  <span className="moment-type-card-body">
+                    A future light you hope to share — date, place, who you hope is there, and why it
+                    matters.
+                  </span>
+                </button>
+              </div>
+            )}
+          </section>
+
           <section className="create-section" aria-labelledby="sec-photos">
             <h2 id="sec-photos" className="create-section-title">
               Photos
@@ -625,45 +690,6 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
                 />
               </label>
             </div>
-          </section>
-
-          <section className="create-section" aria-labelledby="sec-moment-type">
-            <h2 id="sec-moment-type" className="create-section-title">
-              Memory or anticipation
-            </h2>
-            {isEdit && loadedMomentType === 'looking_ahead' ? (
-              <p className="create-moment-type-readonly">
-                <span className="looking-ahead-pill">Looking ahead</span> This entry is something you’re
-                planning together. When it happens, open it from the journal and choose{' '}
-                <strong>We lived this</strong> to turn it into a past moment.
-              </p>
-            ) : isEdit ? (
-              <p className="create-moment-type-readonly muted">Past moment</p>
-            ) : (
-              <div className="moment-type-grid" role="group" aria-label="Past or looking ahead">
-                <button
-                  type="button"
-                  className={`moment-type-card ${momentType === 'past' ? 'is-selected' : ''}`}
-                  onClick={() => setMomentType('past')}
-                >
-                  <span className="moment-type-card-title">Something we lived</span>
-                  <span className="moment-type-card-body">
-                    A sunrise, sunset, or moment that already happened — with photos and reflection.
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  className={`moment-type-card ${momentType === 'looking_ahead' ? 'is-selected' : ''}`}
-                  onClick={() => setMomentType('looking_ahead')}
-                >
-                  <span className="moment-type-card-title">Something to look forward to</span>
-                  <span className="moment-type-card-body">
-                    A future light you hope to share — date, place, who you hope is there, and why it
-                    matters.
-                  </span>
-                </button>
-              </div>
-            )}
           </section>
 
           <section className="create-section" aria-labelledby="sec-story">

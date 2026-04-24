@@ -67,7 +67,7 @@ type CustomRow = {
   accessLevel: string;
 };
 
-const CREATE_STEPS = ['photos', 'kind', 'anticipation', 'story', 'visibility'] as const;
+const CREATE_STEPS = ['anticipation', 'photos', 'kind', 'story', 'visibility'] as const;
 type CreateStep = (typeof CREATE_STEPS)[number];
 
 function todayDateString(): string {
@@ -95,6 +95,18 @@ function parseDateInput(value: string): Date | null {
   if (!m) return null;
   const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0, 0);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Compare moment `date` (YYYY-MM-DD) to today in local calendar. */
+function calendarDateRelationToToday(dateStr: string): 'past' | 'today' | 'future' | 'invalid' {
+  const parsed = parseDateInput(dateStr);
+  if (!parsed) return 'invalid';
+  const today = new Date();
+  const a = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()).getTime();
+  const b = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  if (a < b) return 'past';
+  if (a > b) return 'future';
+  return 'today';
 }
 
 function newKey() {
@@ -160,7 +172,7 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
 
   const editId = routeEditId ?? null;
   const isEdit = editId != null;
-  const [createStep, setCreateStep] = useState<CreateStep>('photos');
+  const [createStep, setCreateStep] = useState<CreateStep>('anticipation');
 
   const [people, setPeople] = useState<Person[]>([]);
   const [shareUsers, setShareUsers] = useState<SharingUser[]>([]);
@@ -274,6 +286,14 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
       cancelled = true;
     };
   }, [isEdit, editId, router]);
+
+  /** New moments: future calendar date implies Looking ahead; past date cannot be Looking ahead (API). */
+  useEffect(() => {
+    if (isEdit) return;
+    const rel = calendarDateRelationToToday(date);
+    if (rel === 'future') setMomentType('looking_ahead');
+    else if (rel === 'past') setMomentType('past');
+  }, [isEdit, date]);
 
   const shareChoices = useMemo(
     () => shareUsers.filter((u) => u.id > 0),
@@ -669,12 +689,12 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
                   Step {stepIndex + 1} of {CREATE_STEPS.length}
                 </Text>
                 <Text style={styles.stepHeaderTitle}>
-                  {createStep === 'photos'
-                    ? 'Add photos'
-                    : createStep === 'kind'
-                      ? 'Choose kind and time'
-                      : createStep === 'anticipation'
-                        ? 'Memory or anticipation'
+                  {createStep === 'anticipation'
+                    ? 'Something that happened — or you’re looking forward to'
+                    : createStep === 'photos'
+                      ? 'Add photos'
+                      : createStep === 'kind'
+                        ? 'Choose kind and time'
                         : createStep === 'story'
                           ? 'Add story details'
                           : 'Choose who can see this'}
