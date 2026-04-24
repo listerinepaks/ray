@@ -344,7 +344,10 @@ export default function TimelineScreen() {
           accessible
           accessibilityLabel={`Looking ahead, ${lookingAheadSorted.length} total`}>
           <View style={styles.laSummaryHeader}>
-            <Text style={styles.laSummaryTitle}>Looking ahead</Text>
+            <View style={styles.laSummaryTitleRow}>
+              <Ionicons name="sparkles-outline" size={17} color={theme.textPrimary} />
+              <Text style={styles.laSummaryTitle}>Looking ahead</Text>
+            </View>
             <View style={styles.laSummaryCountPill}>
               <Text style={styles.laSummaryCountText}>{lookingAheadSorted.length}</Text>
             </View>
@@ -435,7 +438,7 @@ export default function TimelineScreen() {
                     </Text>
                     {m.moment_type === 'looking_ahead' ? (
                       <View style={styles.lookingLabelInline} accessibilityLabel="Looking ahead">
-                        <Ionicons name="sparkles" size={11} color={theme.textSecondary} />
+                        <Ionicons name="sparkles-outline" size={11} color={theme.textSecondary} />
                         <Text style={styles.lookingLabelInlineText}>Looking ahead</Text>
                       </View>
                     ) : null}
@@ -539,7 +542,7 @@ export default function TimelineScreen() {
             Icon alternatives (Ionicons): sparkles-outline, hourglass-outline (pending), calendar-outline.
           */}
           <Ionicons
-            name="sparkles"
+            name="sparkles-outline"
             size={17}
             color={feedTab === 'looking_ahead' ? theme.textPrimary : theme.textSecondary}
           />
@@ -692,6 +695,13 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(242, 169, 123, 0.38)',
+  },
+  laSummaryTitleRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 0,
   },
   laSummaryTitle: {
     fontFamily: fonts.sansSemiBold,

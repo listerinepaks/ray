@@ -377,7 +377,7 @@ function App() {
           </button>
           {/*
             Icon alternatives: hourglass (pending), calendar (date), telescope (gaze), flag (milestone).
-            Mobile uses Ionicons sparkles (filled) in ray-mobile/app/(app)/index.tsx.
+            Mobile uses Ionicons sparkles-outline in ray-mobile/app/(app)/index.tsx.
           */}
           <button
             type="button"

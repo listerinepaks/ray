@@ -69,7 +69,10 @@ export function Timeline({
       {!loading && !error && hasLaSummary && lookingAheadSummary ? (
         <section className="la-summary" aria-label="Looking ahead">
           <div className="la-summary-header">
-            <h2 className="la-summary-title">Looking ahead</h2>
+            <div className="la-summary-title-row">
+              <SparklesIcon className="la-summary-title-icon" variant="outline" size={18} />
+              <h2 className="la-summary-title">Looking ahead</h2>
+            </div>
             <span className="la-summary-count">{lookingAheadSummary.total}</span>
           </div>
           <ul className="la-summary-rows">
@@ -153,7 +156,7 @@ export function Timeline({
                         <span className="moment-card-looking-label">
                           <SparklesIcon
                             className="moment-card-looking-label-icon"
-                            variant="solid"
+                            variant="outline"
                             size={11}
                           />
                           Looking ahead
