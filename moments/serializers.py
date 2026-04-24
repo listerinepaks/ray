@@ -27,6 +27,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     person_id = serializers.IntegerField(source="id", read_only=True)
     username = serializers.CharField(source="linked_user.username", read_only=True)
     email = serializers.EmailField(source="linked_user.email", read_only=True)
+    linked_user = serializers.IntegerField(source="linked_user_id", read_only=True, allow_null=True)
     display_name = serializers.CharField(source="name")
     bio = serializers.CharField(source="note", required=False, allow_blank=True)
     avatar = serializers.ImageField(source="profile_photo", required=False, allow_null=True)
@@ -39,6 +40,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             "person_id",
             "username",
             "email",
+            "linked_user",
             "display_name",
             "bio",
             "avatar",
@@ -49,6 +51,7 @@ class ProfileSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "username",
             "email",
+            "linked_user",
             "moments_authored",
             "moments_shared_with_me",
             "created_at",
@@ -69,6 +72,7 @@ class PersonProfileSerializer(serializers.ModelSerializer):
     person_id = serializers.IntegerField(source="id", read_only=True)
     username = serializers.SerializerMethodField()
     email = serializers.SerializerMethodField()
+    linked_user = serializers.IntegerField(source="linked_user_id", read_only=True, allow_null=True)
     display_name = serializers.CharField(source="name", read_only=True)
     bio = serializers.CharField(source="note", read_only=True)
     avatar = serializers.ImageField(source="profile_photo", read_only=True)
@@ -81,6 +85,7 @@ class PersonProfileSerializer(serializers.ModelSerializer):
             "person_id",
             "username",
             "email",
+            "linked_user",
             "display_name",
             "bio",
             "avatar",

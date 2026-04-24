@@ -73,6 +73,7 @@ class ProfileMeView(APIView):
             "person_id": None,
             "username": user.username,
             "email": user.email,
+            "linked_user": user.id,
             "display_name": self._default_name(),
             "bio": "",
             "avatar": None,

@@ -1,7 +1,8 @@
-import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AspectFitImage } from '../components/AspectFitImage'
 import { LocationPinIcon } from '../components/LocationPinIcon'
+import { SparklesIcon } from '../components/SparklesIcon'
 import { formatSmartDate } from '../formatSmartDate'
 import {
   createMomentComment,
@@ -92,7 +93,15 @@ const REACTION_TYPES = [
   { type: 'wow', label: 'Wow', emoji: '⚡' },
 ] as const
 
-export function EntryView({ currentUser }: { currentUser: Me }) {
+const DOUBLE_CLICK_MS = 320
+
+export function EntryView({
+  currentUser,
+  viewerPersonId,
+}: {
+  currentUser: Me
+  viewerPersonId?: number | null
+}) {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [moment, setMoment] = useState<Moment | null>(null)
@@ -107,6 +116,9 @@ export function EntryView({ currentUser }: { currentUser: Me }) {
   const [reactionBusy, setReactionBusy] = useState<string | null>(null)
   const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null)
   const [convertBusy, setConvertBusy] = useState(false)
+  const [heartFlash, setHeartFlash] = useState(false)
+  const lastHeroClickAtRef = useRef(0)
+  const heartFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -175,6 +187,12 @@ export function EntryView({ currentUser }: { currentUser: Me }) {
       cancelled = true
     }
   }, [moment?.id])
+
+  useEffect(() => {
+    return () => {
+      if (heartFlashTimerRef.current) clearTimeout(heartFlashTimerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -254,6 +272,23 @@ export function EntryView({ currentUser }: { currentUser: Me }) {
     }
   }
 
+  function onHeroImageClick() {
+    if (!canCommentOrReact || reactionBusy) return
+    const now = Date.now()
+    if (now - lastHeroClickAtRef.current <= DOUBLE_CLICK_MS) {
+      lastHeroClickAtRef.current = 0
+      if (heartFlashTimerRef.current) clearTimeout(heartFlashTimerRef.current)
+      setHeartFlash(true)
+      heartFlashTimerRef.current = setTimeout(() => {
+        setHeartFlash(false)
+        heartFlashTimerRef.current = null
+      }, 650)
+      void onToggleReaction('heart')
+      return
+    }
+    lastHeroClickAtRef.current = now
+  }
+
   if (loading) {
     return (
       <div className="entry-shell">
@@ -282,6 +317,18 @@ export function EntryView({ currentUser }: { currentUser: Me }) {
   const displayTitle =
     moment.title.trim() ||
     `${formatKindLabel(moment.kind)} · ${formatSmartDate(moment.date)}`
+  const posterName = moment.author_username ?? `user_${moment.author}`
+  const posterAvatar = moment.author_avatar ? mediaUrl(moment.author_avatar) : ''
+  const isLookingAhead = moment.moment_type === 'looking_ahead'
+  const viewerPid = viewerPersonId ?? null
+  const authorPid = moment.author_person_id ?? null
+  const isSelfMoment = moment.author === currentUser.id
+  const posterProfileTo =
+    isSelfMoment || (authorPid != null && viewerPid != null && authorPid === viewerPid)
+      ? '/profile'
+      : authorPid != null
+        ? `/people/${authorPid}`
+        : null
 
   return (
     <article className="entry-view">
@@ -290,17 +337,6 @@ export function EntryView({ currentUser }: { currentUser: Me }) {
           ← All moments
         </Link>
         <div className="entry-nav-actions">
-          {moment.moment_type === 'looking_ahead' &&
-          moment.my_access === 'edit' &&
-          isOnOrBeforeToday(moment.date) ? (
-            <button
-              type="button"
-              className="entry-convert-btn"
-              disabled={convertBusy}
-              onClick={() => void onConvertLookingAhead()}>
-              {convertBusy ? 'Opening…' : 'We lived this'}
-            </button>
-          ) : null}
           {moment.my_access === 'edit' ? (
             <Link className="entry-new" to={`/moments/${moment.id}/edit`}>
               Edit moment
@@ -309,210 +345,302 @@ export function EntryView({ currentUser }: { currentUser: Me }) {
           <Link className="entry-new" to="/moments/new">
             + New moment
           </Link>
-          {moment.my_access ? (
-            <span className="access" title="Your permission on this moment (not a button)">
-              {moment.my_access}
-            </span>
-          ) : null}
         </div>
       </nav>
 
-      {hero ? (
-        <figure className="entry-hero">
-          <AspectFitImage
-            src={mediaUrl(hero.image)}
-            alt={hero.caption || displayTitle}
-            loading="eager"
-            className="entry-hero-fit"
-          />
-          {hero.caption ? <figcaption>{hero.caption}</figcaption> : null}
-        </figure>
-      ) : null}
-
-      <div className="entry-content">
-        <header className="entry-header">
-          {moment.moment_type === 'looking_ahead' ? (
-            <div className="entry-looking-band" role="status">
-              <span className="entry-looking-label">Looking ahead</span>
-              {moment.countdown_phrase ? (
-                <span className="entry-looking-countdown">{moment.countdown_phrase}</span>
-              ) : null}
-              {formatCalculatedLight(moment.calculated_light_at) ? (
-                <span className="entry-looking-sun">
-                  ~{formatKindLabel(moment.kind).toLowerCase()}{' '}
-                  {formatCalculatedLight(moment.calculated_light_at)}
-                </span>
-              ) : null}
-            </div>
-          ) : null}
-          <p className="entry-meta">
-            <span className="kind">{formatKindLabel(moment.kind)}</span>
-            <span className="meta-sep" aria-hidden>
-              ·
-            </span>
-            <time dateTime={moment.date}>{formatSmartDate(moment.date)}</time>
-            {observedTime ? (
-              <>
-                <span className="meta-sep" aria-hidden>
-                  ·
-                </span>
-                <span className="observed">{observedTime}</span>
-              </>
-            ) : null}
-          </p>
-          <h1 className="entry-title">{displayTitle}</h1>
-          {moment.bible_verse ? (
-            <p className="entry-bible-verse">{moment.bible_verse}</p>
-          ) : null}
-          {moment.location_name ? (
-            <p className="entry-location entry-location-with-icon">
-              <LocationPinIcon className="entry-location-icon" />
-              <span>{moment.location_name}</span>
-            </p>
-          ) : null}
-        </header>
-
-        {moment.tagged_people.length > 0 ? (
-          <section className="entry-people" aria-label="People">
-            <h2 className="entry-section-label">With</h2>
-            <ul className="people-chips">
-              {moment.tagged_people.map((p) => (
-                <li key={p.id}>
-                  <Link to={`/people/${p.id}`}>{p.name}</Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-
-        {moment.reflection ? (
-          <div className="entry-reflection">
-            {moment.reflection.split('\n').map((para, i) => (
-              <p key={i}>{para}</p>
-            ))}
-          </div>
-        ) : null}
-
-        {moment.original_looking_ahead_note?.trim() ? (
-          <section className="entry-original-lookahead" aria-label="Original looking ahead note">
-            <h2 className="entry-section-label">What you were looking forward to</h2>
-            <div className="entry-reflection entry-reflection--original">
-              {moment.original_looking_ahead_note.split('\n').map((para, i) => (
-                <p key={i}>{para}</p>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {rest.length > 0 ? (
-          <div className="entry-gallery">
-            {rest.map((ph) => (
-              <figure key={ph.id} className="entry-gallery-item">
-                <AspectFitImage
-                  src={mediaUrl(ph.image)}
-                  alt={ph.caption || ''}
-                  loading="lazy"
-                  className="entry-gallery-fit"
+      <div className="entry-moment-shell">
+        <div
+          className={`moment-card entry-moment-card${isLookingAhead ? ' moment-card--looking-ahead' : ''}`}>
+          {posterProfileTo ? (
+            <Link className="moment-card-poster" to={posterProfileTo}>
+              {posterAvatar ? (
+                <img
+                  src={posterAvatar}
+                  alt=""
+                  className="moment-card-poster-avatar"
+                  width={36}
+                  height={36}
                 />
-                {ph.caption ? <figcaption>{ph.caption}</figcaption> : null}
-              </figure>
-            ))}
-          </div>
-        ) : null}
-
-        {moment.my_access ? (
-          <section className="entry-social" aria-label="Reactions and comments">
-            <h2 className="entry-section-label">Reactions</h2>
-            {socialError ? (
-              <p className="entry-social-error" role="alert">
-                {socialError}
-              </p>
-            ) : null}
-            <div className="entry-reaction-bar">
-              {REACTION_TYPES.map(({ type, label, emoji }) => {
-                const count = reactions.filter((r) => r.type === type).length
-                const mine = reactions.some((r) => r.user === currentUser.id && r.type === type)
-                const busy = reactionBusy === type
-                return (
-                  <button
-                    key={type}
-                    type="button"
-                    className={`entry-reaction-btn${mine ? ' entry-reaction-btn--mine' : ''}`}
-                    disabled={!canCommentOrReact || busy}
-                    onClick={() => void onToggleReaction(type)}
-                    aria-pressed={mine}
-                    aria-label={`${label}, ${count}`}>
-                    {busy ? (
-                      <span className="entry-reaction-busy">…</span>
-                    ) : (
-                      <>
-                        <span className="entry-reaction-emoji" aria-hidden>
-                          {emoji}
-                        </span>
-                        <span className="entry-reaction-count">{count}</span>
-                      </>
-                    )}
-                  </button>
-                )
-              })}
+              ) : (
+                <span className="moment-card-poster-avatar moment-card-poster-avatar--fallback" aria-hidden>
+                  {posterName.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              <div className="moment-card-poster-main">
+                <div className="moment-card-poster-row">
+                  <span className="moment-card-poster-name">{posterName}</span>
+                  {isLookingAhead ? (
+                    <span className="moment-card-looking-label">
+                      <SparklesIcon className="moment-card-looking-label-icon" variant="outline" size={11} />
+                      Looking ahead
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </Link>
+          ) : (
+            <div className="moment-card-poster">
+              {posterAvatar ? (
+                <img
+                  src={posterAvatar}
+                  alt=""
+                  className="moment-card-poster-avatar"
+                  width={36}
+                  height={36}
+                />
+              ) : (
+                <span className="moment-card-poster-avatar moment-card-poster-avatar--fallback" aria-hidden>
+                  {posterName.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              <div className="moment-card-poster-main">
+                <div className="moment-card-poster-row">
+                  <span className="moment-card-poster-name">{posterName}</span>
+                  {isLookingAhead ? (
+                    <span className="moment-card-looking-label">
+                      <SparklesIcon className="moment-card-looking-label-icon" variant="outline" size={11} />
+                      Looking ahead
+                    </span>
+                  ) : null}
+                </div>
+              </div>
             </div>
-            {!canCommentOrReact ? (
-              <p className="entry-social-hint muted">View-only: you can see reactions but not add your own.</p>
-            ) : null}
+          )}
 
-            <h2 className="entry-section-label entry-comments-heading">Comments</h2>
-            {comments.length === 0 ? (
-              <p className="muted entry-no-comments">No comments yet.</p>
-            ) : (
-              <ul className="entry-comment-list">
-                {comments.map((c) => (
-                  <li key={c.id} className="entry-comment-card">
-                    <div className="entry-comment-head">
-                      <span className="entry-comment-author">
-                        {c.author_username ?? `User ${c.author}`}
-                      </span>
-                      <time className="entry-comment-time" dateTime={c.created_at}>
-                        {formatCommentTime(c.created_at)}
-                      </time>
-                    </div>
-                    <p className="entry-comment-body">{c.text}</p>
-                    {c.author === currentUser.id ? (
-                      <button
-                        type="button"
-                        className="entry-comment-remove"
-                        disabled={deletingCommentId === c.id}
-                        onClick={() => void onDeleteComment(c.id)}>
-                        {deletingCommentId === c.id ? 'Removing…' : 'Remove'}
-                      </button>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
+          {hero ? (
+            <div
+              className="moment-card-thumb entry-hero-thumb"
+              role={canCommentOrReact && !reactionBusy ? 'button' : undefined}
+              tabIndex={canCommentOrReact && !reactionBusy ? 0 : undefined}
+              onClick={() => onHeroImageClick()}
+              onKeyDown={(e) => {
+                if (!canCommentOrReact || reactionBusy) return
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onHeroImageClick()
+                }
+              }}
+              aria-label={canCommentOrReact ? 'Photo — double-click to heart' : undefined}>
+              <AspectFitImage
+                src={mediaUrl(hero.image)}
+                alt={hero.caption || displayTitle}
+                loading="eager"
+                className="moment-card-aspect-fit"
+              />
+              {sortedPhotos.length > 1 ? (
+                <span className="moment-card-photo-badge">{sortedPhotos.length} photos</span>
+              ) : null}
+              {heartFlash ? (
+                <div className="entry-hero-heart-flash" aria-hidden>
+                  <span>❤️</span>
+                </div>
+              ) : null}
+              {hero.caption ? <p className="entry-hero-caption">{hero.caption}</p> : null}
+            </div>
+          ) : (
+            <div className="moment-card-placeholder" aria-hidden />
+          )}
 
-            {canCommentOrReact ? (
-              <form className="entry-comment-form" onSubmit={onSubmitComment}>
-                <label className="entry-comment-label">
-                  <span className="visually-hidden">New comment</span>
-                  <textarea
-                    className="entry-comment-input"
-                    value={commentDraft}
-                    onChange={(e) => setCommentDraft(e.target.value)}
-                    placeholder="Write a comment…"
-                    rows={3}
-                    disabled={postingComment}
-                  />
-                </label>
+          {isLookingAhead &&
+          (moment.countdown_phrase ||
+            formatCalculatedLight(moment.calculated_light_at) ||
+            (moment.my_access === 'edit' && isOnOrBeforeToday(moment.date))) ? (
+            <div className="entry-looking-detail-band" role="status">
+              <div className="entry-looking-detail-band-main">
+                {moment.countdown_phrase ? (
+                  <span className="entry-looking-detail-countdown">{moment.countdown_phrase}</span>
+                ) : null}
+                {formatCalculatedLight(moment.calculated_light_at) ? (
+                  <span className="entry-looking-detail-sun">
+                    ~{formatKindLabel(moment.kind).toLowerCase()} {formatCalculatedLight(moment.calculated_light_at)}
+                  </span>
+                ) : null}
+              </div>
+              {moment.my_access === 'edit' && isOnOrBeforeToday(moment.date) ? (
                 <button
-                  type="submit"
-                  className="entry-comment-submit"
-                  disabled={postingComment || !commentDraft.trim()}>
-                  {postingComment ? 'Posting…' : 'Post'}
+                  type="button"
+                  className="entry-convert-btn entry-convert-btn--in-band"
+                  disabled={convertBusy}
+                  onClick={() => void onConvertLookingAhead()}>
+                  {convertBusy ? 'Opening…' : 'We lived this'}
                 </button>
-              </form>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="moment-card-body entry-moment-body">
+            <header className="entry-header">
+              <div className="moment-head">
+                <span className="kind">{formatKindLabel(moment.kind)}</span>
+                <time className="date" dateTime={moment.date}>
+                  {formatSmartDate(moment.date)}
+                </time>
+                {observedTime ? <span className="date">{observedTime}</span> : null}
+                {moment.my_access ? (
+                  <span className="access" title="Your permission on this moment (not a button)">
+                    {moment.my_access}
+                  </span>
+                ) : null}
+              </div>
+              {moment.title.trim() ? (
+                <h1 className="title entry-moment-title">{moment.title.trim()}</h1>
+              ) : (
+                <h1 className="title title-fallback entry-moment-title">
+                  {formatKindLabel(moment.kind)} · {formatSmartDate(moment.date)}
+                </h1>
+              )}
+              {moment.bible_verse ? <p className="bible-verse">{moment.bible_verse}</p> : null}
+              {moment.location_name ? (
+                <p className="location location-with-icon">
+                  <LocationPinIcon className="location-icon" />
+                  <span className="location-text">{moment.location_name}</span>
+                </p>
+              ) : null}
+            </header>
+
+            {moment.reflection ? (
+              <div className="reflection entry-moment-reflection">
+                {moment.reflection.split('\n').map((para, i) => (
+                  <p key={i}>{para}</p>
+                ))}
+              </div>
             ) : null}
-          </section>
-        ) : null}
+
+            {moment.original_looking_ahead_note?.trim() ? (
+              <section className="entry-original-lookahead" aria-label="Original looking ahead note">
+                <h2 className="entry-section-label">What you were looking forward to</h2>
+                <div className="reflection entry-moment-reflection entry-reflection--original">
+                  {moment.original_looking_ahead_note.split('\n').map((para, i) => (
+                    <p key={i}>{para}</p>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {rest.length > 0 ? (
+              <div className="entry-gallery">
+                {rest.map((ph) => (
+                  <figure key={ph.id} className="entry-gallery-item">
+                    <AspectFitImage
+                      src={mediaUrl(ph.image)}
+                      alt={ph.caption || ''}
+                      loading="lazy"
+                      className="entry-gallery-fit"
+                    />
+                    {ph.caption ? <figcaption>{ph.caption}</figcaption> : null}
+                  </figure>
+                ))}
+              </div>
+            ) : null}
+
+            {moment.tagged_people.length > 0 ? (
+              <section className="entry-people" aria-label="People">
+                <h2 className="entry-section-label">People</h2>
+                <ul className="people-chips">
+                  {moment.tagged_people.map((p) => (
+                    <li key={p.id}>
+                      <Link to={`/people/${p.id}`}>{p.name}</Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {moment.my_access ? (
+              <section className="entry-social" aria-label="Reactions and comments">
+                <h2 className="entry-section-label">Reactions</h2>
+                {socialError ? (
+                  <p className="entry-social-error" role="alert">
+                    {socialError}
+                  </p>
+                ) : null}
+                <div className="entry-reaction-bar">
+                  {REACTION_TYPES.map(({ type, label, emoji }) => {
+                    const count = reactions.filter((r) => r.type === type).length
+                    const mine = reactions.some((r) => r.user === currentUser.id && r.type === type)
+                    const busy = reactionBusy === type
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        className={`entry-reaction-btn${mine ? ' entry-reaction-btn--mine' : ''}`}
+                        disabled={!canCommentOrReact || busy}
+                        onClick={() => void onToggleReaction(type)}
+                        aria-pressed={mine}
+                        aria-label={`${label}, ${count}`}>
+                        {busy ? (
+                          <span className="entry-reaction-busy">…</span>
+                        ) : (
+                          <>
+                            <span className="entry-reaction-emoji" aria-hidden>
+                              {emoji}
+                            </span>
+                            <span className="entry-reaction-count">{count}</span>
+                          </>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+                {!canCommentOrReact ? (
+                  <p className="entry-social-hint muted">View-only: you can see reactions but not add your own.</p>
+                ) : null}
+
+                <h2 className="entry-section-label entry-comments-heading">Comments</h2>
+                {comments.length === 0 ? (
+                  <p className="muted entry-no-comments">No comments yet.</p>
+                ) : (
+                  <ul className="entry-comment-list">
+                    {comments.map((c) => (
+                      <li key={c.id} className="entry-comment-card">
+                        <div className="entry-comment-head">
+                          <span className="entry-comment-author">
+                            {c.author_username ?? `User ${c.author}`}
+                          </span>
+                          <time className="entry-comment-time" dateTime={c.created_at}>
+                            {formatCommentTime(c.created_at)}
+                          </time>
+                        </div>
+                        <p className="entry-comment-body">{c.text}</p>
+                        {c.author === currentUser.id ? (
+                          <button
+                            type="button"
+                            className="entry-comment-remove"
+                            disabled={deletingCommentId === c.id}
+                            onClick={() => void onDeleteComment(c.id)}>
+                            {deletingCommentId === c.id ? 'Removing…' : 'Remove'}
+                          </button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {canCommentOrReact ? (
+                  <form className="entry-comment-form" onSubmit={onSubmitComment}>
+                    <label className="entry-comment-label">
+                      <span className="visually-hidden">New comment</span>
+                      <textarea
+                        className="entry-comment-input"
+                        value={commentDraft}
+                        onChange={(e) => setCommentDraft(e.target.value)}
+                        placeholder="Write a comment…"
+                        rows={3}
+                        disabled={postingComment}
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      className="entry-comment-submit"
+                      disabled={postingComment || !commentDraft.trim()}>
+                      {postingComment ? 'Posting…' : 'Post'}
+                    </button>
+                  </form>
+                ) : null}
+              </section>
+            ) : null}
+          </div>
+        </div>
       </div>
     </article>
   )

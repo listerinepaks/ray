@@ -1,10 +1,12 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { fonts, theme } from '@/constants/theme';
-import { fetchPeople, fetchProfileByPerson, mediaUrl, type Profile } from '@/lib/api';
+import { fetchMoments, fetchPeople, fetchProfileByPerson, mediaUrl, type Moment, type Profile } from '@/lib/api';
+
+const GRID_GAP = 8;
 
 export default function PersonProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -18,6 +20,9 @@ export default function PersonProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [authorMoments, setAuthorMoments] = useState<Moment[]>([]);
+  const [momentsLoading, setMomentsLoading] = useState(false);
+  const [momentsError, setMomentsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (id == null) {
@@ -52,6 +57,37 @@ export default function PersonProfileScreen() {
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!profile?.linked_user) {
+      setAuthorMoments([]);
+      setMomentsError(null);
+      setMomentsLoading(false);
+      return;
+    }
+    const authorId = profile.linked_user;
+    let cancelled = false;
+    (async () => {
+      try {
+        setMomentsLoading(true);
+        setMomentsError(null);
+        const all = await fetchMoments();
+        if (cancelled) return;
+        const rows = all
+          .filter((m) => m.author === authorId)
+          .slice()
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        setAuthorMoments(rows);
+      } catch (e) {
+        if (!cancelled) setMomentsError(e instanceof Error ? e.message : 'Could not load moments.');
+      } finally {
+        if (!cancelled) setMomentsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [profile]);
 
   if (loading) {
     return (
@@ -111,6 +147,45 @@ export default function PersonProfileScreen() {
             <Text style={styles.statLabel}>Moments shared</Text>
           </View>
         </View>
+      </View>
+
+      <View style={styles.momentsSection} accessibilityRole="summary" accessibilityLabel="Moments from this person">
+        <Text style={styles.momentsSectionTitle}>Moments</Text>
+        {!profile.linked_user ? (
+          <Text style={styles.momentsHint}>
+            Moments from this person will show here once their profile is linked to an account.
+          </Text>
+        ) : momentsLoading ? (
+          <ActivityIndicator color={theme.textSecondary} style={{ marginVertical: 8 }} />
+        ) : momentsError ? (
+          <Text style={styles.momentsError}>{momentsError}</Text>
+        ) : authorMoments.length === 0 ? (
+          <Text style={styles.momentsHint}>No moments to show yet.</Text>
+        ) : (
+          <View style={styles.momentsGrid}>
+            {authorMoments.map((m) => {
+              const sorted = [...(m.photos ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+              const first = sorted[0];
+              const thumb = first ? mediaUrl(first.image) : '';
+              return (
+                <Pressable
+                  key={m.id}
+                  onPress={() => router.push(`/moment/${m.id}`)}
+                  style={styles.momentTile}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open moment ${m.id}`}>
+                  {thumb ? (
+                    <Image source={{ uri: thumb }} style={styles.momentTileImage} />
+                  ) : (
+                    <View style={[styles.momentTileImage, styles.momentTileFallback]}>
+                      <Text style={styles.momentTileFallbackText}>No photo</Text>
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
       </View>
     </ScrollView>
   );
@@ -184,4 +259,49 @@ const styles = StyleSheet.create({
   },
   statValue: { fontFamily: fonts.sansSemiBold, fontSize: 22, color: theme.textPrimary },
   statLabel: { fontFamily: fonts.sansRegular, fontSize: 14, color: theme.textSecondary },
+  momentsSection: { gap: 10, marginTop: 4 },
+  momentsSectionTitle: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 12,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: theme.textMuted,
+  },
+  momentsHint: {
+    fontFamily: fonts.sansRegular,
+    fontSize: 14,
+    lineHeight: 20,
+    color: theme.textSecondary,
+  },
+  momentsError: {
+    fontFamily: fonts.sansRegular,
+    fontSize: 14,
+    color: theme.error,
+  },
+  momentsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
+  momentTile: {
+    width: '31.5%',
+    aspectRatio: 1,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: theme.bgPrimary,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+  },
+  momentTileImage: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: theme.bgSecondary,
+  },
+  momentTileFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  momentTileFallbackText: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 11,
+    color: theme.textMuted,
+    textAlign: 'center',
+  },
 });

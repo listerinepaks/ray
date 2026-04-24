@@ -66,6 +66,8 @@ export type Profile = {
   person_id: number | null;
   username: string;
   email: string;
+  /** Auth user id when this profile is linked to an account (filter moments by `author`). */
+  linked_user?: number | null;
   display_name: string;
   bio: string;
   avatar: string | null;

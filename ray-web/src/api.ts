@@ -62,6 +62,8 @@ export type Profile = {
   person_id: number | null
   username: string
   email: string
+  /** Auth user id when this profile is linked to an account (filter moments by `author`). */
+  linked_user?: number | null
   display_name: string
   bio: string
   avatar: string | null
@@ -237,6 +239,8 @@ export type Moment = {
   id: number
   author: number
   author_username?: string
+  /** Linked `Person` id for the author when available (preferred for profile URLs). */
+  author_person_id?: number | null
   /** Relative media path when author has a linked Person with a profile photo */
   author_avatar?: string | null
   /** `past` (default) or `looking_ahead` */
