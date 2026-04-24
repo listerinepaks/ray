@@ -579,6 +579,34 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+.moment-card--looking-ahead {
+  background: linear-gradient(180deg, rgba(255, 252, 248, 0.98) 0%, #fffefb 55%, var(--card-bg) 100%);
+  border-color: rgba(244, 201, 93, 0.42);
+  box-shadow: 0 1px 4px rgba(244, 201, 93, 0.1);
+}
+
+.moment-card--looking-ahead .moment-card-poster {
+  border-bottom-color: rgba(244, 201, 93, 0.22);
+}
+
+.moment-card-looking-label {
+  flex: 0 0 auto;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: rgba(244, 201, 93, 0.38);
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+}
+
+.moment-card-countdown {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #c97d4a;
+}
+
 .moment-card-poster {
   display: flex;
   flex-direction: row;
@@ -626,6 +654,10 @@
   .moment-card:hover {
     box-shadow: 0 6px 22px rgba(47, 47, 47, 0.1);
     border-color: rgba(167, 183, 201, 0.45);
+  }
+
+  .moment-card--looking-ahead:hover {
+    border-color: rgba(244, 201, 93, 0.65);
   }
 
   .moment-card:hover .moment-card-thumb .aspect-fit-media img {
@@ -941,6 +973,72 @@
 
 .entry-header {
   margin-bottom: 1.5rem;
+}
+
+.entry-looking-band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: rgba(244, 201, 93, 0.12);
+  border: 1px solid rgba(244, 201, 93, 0.35);
+}
+
+.entry-looking-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.entry-looking-countdown {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--accent-peach);
+}
+
+.entry-looking-sun {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.entry-convert-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.45rem 1rem;
+  border-radius: 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: Inter, sans-serif;
+  border: none;
+  cursor: pointer;
+  color: var(--text-primary);
+  background: var(--accent-golden);
+  box-shadow: 0 1px 2px rgba(47, 47, 47, 0.06);
+  text-decoration: none;
+}
+
+.entry-convert-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.entry-original-lookahead {
+  margin: 1.75rem 0 0;
+  padding-top: 1.25rem;
+  border-top: 1px dashed rgba(47, 47, 47, 0.12);
+}
+
+.entry-reflection--original {
+  font-style: italic;
+  color: var(--text-secondary);
 }
 
 .entry-title {

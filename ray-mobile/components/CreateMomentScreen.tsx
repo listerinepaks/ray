@@ -67,7 +67,7 @@ type CustomRow = {
   accessLevel: string;
 };
 
-const CREATE_STEPS = ['photos', 'kind', 'story', 'visibility'] as const;
+const CREATE_STEPS = ['photos', 'kind', 'anticipation', 'story', 'visibility'] as const;
 type CreateStep = (typeof CREATE_STEPS)[number];
 
 function todayDateString(): string {
@@ -177,6 +177,8 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
   const [locationName, setLocationName] = useState('');
   /** Default `friends`: accepted friends get access (see `sync_moment_access`). `tagged` does not include friends. */
   const [visibility, setVisibility] = useState<string>(VIS.friends);
+  const [momentType, setMomentType] = useState<'past' | 'looking_ahead'>('past');
+  const [loadedMomentType, setLoadedMomentType] = useState<'past' | 'looking_ahead' | null>(null);
   const [selectedPeople, setSelectedPeople] = useState<Set<number>>(new Set());
   const [customRows, setCustomRows] = useState<CustomRow[]>([]);
 
@@ -237,6 +239,9 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
           return;
         }
         setKind(m.kind === 'sunset' ? 'sunset' : m.kind === 'other' ? 'other' : 'sunrise');
+        const mt = m.moment_type === 'looking_ahead' ? 'looking_ahead' : 'past';
+        setMomentType(mt);
+        setLoadedMomentType(mt);
         setDate(m.date);
         setObservedAt(m.observed_at ? toDatetimeLocal(m.observed_at) : '');
         setDateEdited(true);
@@ -411,6 +416,9 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
       reflection: reflection.trim() || undefined,
       location_name: locationName.trim() || undefined,
     };
+    if (!isEdit) {
+      payload.moment_type = momentType;
+    }
     if (observedAt.trim()) {
       const d = new Date(observedAt);
       if (!Number.isNaN(d.getTime())) payload.observed_at = d.toISOString();
@@ -439,6 +447,18 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
 
   async function onSubmit() {
     setSubmitError(null);
+
+    if (
+      !isEdit &&
+      momentType === 'past' &&
+      photos.length === 0 &&
+      existingPhotos.length === 0
+    ) {
+      setSubmitError(
+        'Add at least one photo for a past moment, or go back and choose “Something to look forward to”.',
+      );
+      return;
+    }
 
     if (visibility === VIS.tagged && selectedPeople.size === 0) {
       setSubmitError(
@@ -531,10 +551,6 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
 
   function goToNextStep() {
     setSubmitError(null);
-    if (createStep === 'photos' && photos.length === 0) {
-      setSubmitError('Add at least one photo to continue.');
-      return;
-    }
     const next = CREATE_STEPS[stepIndex + 1];
     if (next) setCreateStep(next);
   }
@@ -657,9 +673,11 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
                     ? 'Add photos'
                     : createStep === 'kind'
                       ? 'Choose kind and time'
-                      : createStep === 'story'
-                        ? 'Add story details'
-                        : 'Choose who can see this'}
+                      : createStep === 'anticipation'
+                        ? 'Memory or anticipation'
+                        : createStep === 'story'
+                          ? 'Add story details'
+                          : 'Choose who can see this'}
                 </Text>
               </View>
             ) : null}
@@ -710,6 +728,45 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
               </>
             ) : null}
 
+            {(!isWizard || createStep === 'anticipation') ? (
+              <>
+                <Text style={styles.sectionTitle}>Memory or anticipation</Text>
+                {isEdit && loadedMomentType === 'looking_ahead' ? (
+                  <Text style={styles.muted}>
+                    Looking ahead — when it happens, open this moment and tap &quot;We lived this&quot; to
+                    turn it into a past entry.
+                  </Text>
+                ) : isEdit ? (
+                  <Text style={styles.muted}>Past moment</Text>
+                ) : (
+                  <View style={styles.momentTypeCol}>
+                    <Pressable
+                      onPress={() => setMomentType('past')}
+                      style={[
+                        styles.kindCard,
+                        momentType === 'past' && styles.kindCardSelected,
+                      ]}>
+                      <Text style={styles.kindLabel}>Something we lived</Text>
+                      <Text style={styles.kindHint}>
+                        Already happened — photos and reflection.
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setMomentType('looking_ahead')}
+                      style={[
+                        styles.kindCard,
+                        momentType === 'looking_ahead' && styles.kindCardSelected,
+                      ]}>
+                      <Text style={styles.kindLabel}>Something to look forward to</Text>
+                      <Text style={styles.kindHint}>
+                        A future sunrise or sunset you hope to share together.
+                      </Text>
+                    </Pressable>
+                  </View>
+                )}
+              </>
+            ) : null}
+
             {(!isWizard || createStep === 'story') ? (
               <>
             <Text style={styles.sectionTitle}>Story</Text>
@@ -736,7 +793,12 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
               />
             </View>
             <View style={styles.field}>
-              <Text style={styles.label}>Reflection</Text>
+              <Text style={styles.label}>
+                {(isEdit && loadedMomentType === 'looking_ahead') ||
+                (!isEdit && momentType === 'looking_ahead')
+                  ? 'Note (why this matters)'
+                  : 'Reflection'}
+              </Text>
               <TextInput
                 value={reflection}
                 onChangeText={setReflection}
@@ -1175,6 +1237,7 @@ const styles = StyleSheet.create({
     color: theme.textMuted,
   },
   kindRow: { flexDirection: 'row', gap: 12, marginBottom: 14 },
+  momentTypeCol: { gap: 12, marginBottom: 14 },
   kindCard: {
     flex: 1,
     borderRadius: 14,

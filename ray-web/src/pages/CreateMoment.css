@@ -626,3 +626,78 @@
     min-height: 2.75rem;
   }
 }
+
+/* Past vs Looking Ahead */
+.moment-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 0.25rem;
+}
+
+@media (max-width: 900px) {
+  .moment-type-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.moment-type-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 1rem 1.1rem;
+  border-radius: 16px;
+  border: 2px solid rgba(47, 47, 47, 0.1);
+  background: var(--card-bg);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.moment-type-card:hover {
+  border-color: rgba(167, 183, 201, 0.55);
+}
+
+.moment-type-card.is-selected {
+  border-color: #e8b832;
+  background: rgba(244, 201, 93, 0.14);
+  box-shadow: 0 2px 12px rgba(244, 201, 93, 0.18);
+}
+
+.moment-type-card-title {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.moment-type-card-body {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.create-moment-type-readonly {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.looking-ahead-pill {
+  display: inline-block;
+  margin-right: 0.35rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: rgba(244, 201, 93, 0.38);
+  vertical-align: middle;
+}

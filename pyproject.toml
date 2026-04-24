@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Ray API"
 requires-python = ">=3.12"
 dependencies = [
+    "astral>=3.2,<4.0",
     "django>=5.1,<6.0",
     "django-cors-headers>=4.6,<5.0",
     "djangorestframework>=3.15,<4.0",

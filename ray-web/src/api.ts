@@ -193,12 +193,18 @@ export type Moment = {
   author_username?: string
   /** Relative media path when author has a linked Person with a profile photo */
   author_avatar?: string | null
+  /** `past` (default) or `looking_ahead` */
+  moment_type?: 'past' | 'looking_ahead' | string
+  countdown_phrase?: string | null
   kind: string
   date: string
   observed_at: string | null
+  calculated_light_at?: string | null
   title: string
   bible_verse: string
   reflection: string
+  /** Preserved Looking Ahead note after conversion to past */
+  original_looking_ahead_note?: string
   location_name: string
   latitude: string | null
   longitude: string | null
@@ -420,6 +426,8 @@ export async function fetchSharingUsers(): Promise<SharingUser[]> {
 
 export type CreateMomentPayload = {
   kind: string
+  /** Omit on PATCH; use convert endpoint to change Looking Ahead → past */
+  moment_type?: 'past' | 'looking_ahead'
   date: string
   observed_at?: string | null
   title?: string
@@ -446,6 +454,27 @@ export async function createMoment(payload: CreateMomentPayload): Promise<Moment
       ...(token ? { 'X-CSRFToken': token } : {}),
     },
     body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error(await parseErrorBody(res))
+  return res.json() as Promise<Moment>
+}
+
+export async function postConvertMoment(
+  id: number,
+  body: { reflection?: string } = {},
+): Promise<Moment> {
+  await ensureCsrfCookie()
+  const token = getCsrfTokenFromDocument()
+  const base = getApiBase()
+  const res = await fetch(`${base}/api/moments/${id}/convert/`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(token ? { 'X-CSRFToken': token } : {}),
+    },
+    body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error(await parseErrorBody(res))
   return res.json() as Promise<Moment>

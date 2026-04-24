@@ -1,5 +1,8 @@
+from datetime import timedelta
+
 from django.core.files.storage import default_storage
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
 from .access import get_moment_access_level, sync_moment_access
@@ -137,6 +140,7 @@ class MomentSerializer(serializers.ModelSerializer):
     reactions_count = serializers.SerializerMethodField()
     author_username = serializers.CharField(source="author.username", read_only=True)
     author_avatar = serializers.SerializerMethodField()
+    countdown_phrase = serializers.SerializerMethodField()
 
     people = MomentPersonWriteSerializer(many=True, write_only=True, required=False)
     access = MomentAccessWriteSerializer(many=True, write_only=True, required=False)
@@ -148,12 +152,16 @@ class MomentSerializer(serializers.ModelSerializer):
             "author",
             "author_username",
             "author_avatar",
+            "moment_type",
+            "countdown_phrase",
             "kind",
             "date",
             "observed_at",
+            "calculated_light_at",
             "title",
             "bible_verse",
             "reflection",
+            "original_looking_ahead_note",
             "location_name",
             "latitude",
             "longitude",
@@ -169,7 +177,15 @@ class MomentSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "author", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "author",
+            "calculated_light_at",
+            "original_looking_ahead_note",
+            "countdown_phrase",
+            "created_at",
+            "updated_at",
+        ]
 
     def get_author_avatar(self, obj):
         """Return a fetchable URL; DB/annotate only stores the storage key (same as ImageField.name)."""
@@ -215,6 +231,22 @@ class MomentSerializer(serializers.ModelSerializer):
     def get_my_access(self, obj):
         return get_moment_access_level(self.context["request"].user, obj)
 
+    def get_countdown_phrase(self, obj):
+        if obj.moment_type != Moment.MOMENT_TYPE_LOOKING_AHEAD:
+            return None
+        today = timezone.localdate()
+        d = obj.date
+        if d < today:
+            return "A moment to remember"
+        if d == today:
+            if obj.kind == Moment.KIND_SUNSET:
+                return "Tonight"
+            return "Today"
+        if d == today + timedelta(days=1):
+            return "Tomorrow"
+        n = (d - today).days
+        return f"In {n} days"
+
     def get_tagged_people(self, obj):
         links = obj.people.select_related("person", "person__linked_user")
         return [
@@ -238,6 +270,14 @@ class MomentSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
+        if self.instance is not None:
+            if "moment_type" in attrs and attrs["moment_type"] != self.instance.moment_type:
+                raise serializers.ValidationError(
+                    {
+                        "moment_type": "Use POST /api/moments/{id}/convert/ to mark a Looking Ahead entry as past."
+                    }
+                )
+
         visibility_mode = attrs.get(
             "visibility_mode",
             getattr(self.instance, "visibility_mode", Moment.VISIBILITY_TAGGED),
@@ -250,6 +290,18 @@ class MomentSerializer(serializers.ModelSerializer):
 
         if visibility_mode == Moment.VISIBILITY_CUSTOM and access is not None and not access:
             raise serializers.ValidationError("Custom visibility requires at least one access entry.")
+
+        moment_type = attrs.get(
+            "moment_type",
+            getattr(self.instance, "moment_type", Moment.MOMENT_TYPE_PAST) if self.instance else Moment.MOMENT_TYPE_PAST,
+        )
+        date_val = attrs.get("date", getattr(self.instance, "date", None) if self.instance else None)
+        if self.instance is None and moment_type == Moment.MOMENT_TYPE_LOOKING_AHEAD and date_val is not None:
+            today = timezone.localdate()
+            if date_val < today:
+                raise serializers.ValidationError(
+                    {"date": "Looking Ahead uses today or a future date."}
+                )
 
         return attrs
 

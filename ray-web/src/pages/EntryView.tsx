@@ -13,6 +13,7 @@ import {
   fetchMomentReactions,
   mediaUrl,
   MomentNotFoundError,
+  postConvertMoment,
   type Me,
   type Moment,
   type MomentComment,
@@ -32,6 +33,38 @@ function formatObserved(iso: string | null): string | null {
     if (Number.isNaN(d.getTime())) return null
     return new Intl.DateTimeFormat(undefined, {
       timeStyle: 'short',
+    }).format(d)
+  } catch {
+    return null
+  }
+}
+
+function parseYmdLocal(ymd: string): Date {
+  const parts = ymd.split('-').map(Number)
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return new Date(NaN)
+  const [y, mo, d] = parts
+  return new Date(y!, mo! - 1, d!)
+}
+
+function isOnOrBeforeToday(ymd: string): boolean {
+  const t = parseYmdLocal(ymd)
+  if (Number.isNaN(t.getTime())) return false
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return t.getTime() <= today.getTime()
+}
+
+function formatCalculatedLight(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return null
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
     }).format(d)
   } catch {
     return null
@@ -73,6 +106,7 @@ export function EntryView({ currentUser }: { currentUser: Me }) {
   const [postingComment, setPostingComment] = useState(false)
   const [reactionBusy, setReactionBusy] = useState<string | null>(null)
   const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null)
+  const [convertBusy, setConvertBusy] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -188,6 +222,24 @@ export function EntryView({ currentUser }: { currentUser: Me }) {
     }
   }
 
+  async function onConvertLookingAhead() {
+    if (!moment) return
+    const ok = window.confirm(
+      'Did this happen? Your note will be kept, and you can add how it felt and any photos on the next screen.',
+    )
+    if (!ok) return
+    setConvertBusy(true)
+    setSocialError(null)
+    try {
+      await postConvertMoment(moment.id, { reflection: '' })
+      navigate(`/moments/${moment.id}/edit`, { replace: true })
+    } catch (err) {
+      setSocialError(err instanceof Error ? err.message : 'Could not update this moment.')
+    } finally {
+      setConvertBusy(false)
+    }
+  }
+
   async function onDeleteComment(commentId: number) {
     if (!moment) return
     setDeletingCommentId(commentId)
@@ -238,6 +290,17 @@ export function EntryView({ currentUser }: { currentUser: Me }) {
           ← All moments
         </Link>
         <div className="entry-nav-actions">
+          {moment.moment_type === 'looking_ahead' &&
+          moment.my_access === 'edit' &&
+          isOnOrBeforeToday(moment.date) ? (
+            <button
+              type="button"
+              className="entry-convert-btn"
+              disabled={convertBusy}
+              onClick={() => void onConvertLookingAhead()}>
+              {convertBusy ? 'Opening…' : 'We lived this'}
+            </button>
+          ) : null}
           {moment.my_access === 'edit' ? (
             <Link className="entry-new" to={`/moments/${moment.id}/edit`}>
               Edit moment
@@ -268,6 +331,20 @@ export function EntryView({ currentUser }: { currentUser: Me }) {
 
       <div className="entry-content">
         <header className="entry-header">
+          {moment.moment_type === 'looking_ahead' ? (
+            <div className="entry-looking-band" role="status">
+              <span className="entry-looking-label">Looking ahead</span>
+              {moment.countdown_phrase ? (
+                <span className="entry-looking-countdown">{moment.countdown_phrase}</span>
+              ) : null}
+              {formatCalculatedLight(moment.calculated_light_at) ? (
+                <span className="entry-looking-sun">
+                  ~{formatKindLabel(moment.kind).toLowerCase()}{' '}
+                  {formatCalculatedLight(moment.calculated_light_at)}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
           <p className="entry-meta">
             <span className="kind">{formatKindLabel(moment.kind)}</span>
             <span className="meta-sep" aria-hidden>
@@ -314,6 +391,17 @@ export function EntryView({ currentUser }: { currentUser: Me }) {
               <p key={i}>{para}</p>
             ))}
           </div>
+        ) : null}
+
+        {moment.original_looking_ahead_note?.trim() ? (
+          <section className="entry-original-lookahead" aria-label="Original looking ahead note">
+            <h2 className="entry-section-label">What you were looking forward to</h2>
+            <div className="entry-reflection entry-reflection--original">
+              {moment.original_looking_ahead_note.split('\n').map((para, i) => (
+                <p key={i}>{para}</p>
+              ))}
+            </div>
+          </section>
         ) : null}
 
         {rest.length > 0 ? (

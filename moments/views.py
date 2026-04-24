@@ -3,6 +3,7 @@ from django.db.models import Count, OuterRef, Subquery
 from django.http import Http404
 from django.contrib.auth import get_user_model
 from rest_framework import status
+from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
@@ -10,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from .access import (
+    can_edit_moment,
     accept_friendship,
     get_moment_for_nested_view,
     resync_friends_moments_for_user,
@@ -182,6 +184,30 @@ class MomentViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save()
+
+    @action(detail=True, methods=["post"], url_path="convert")
+    def convert(self, request, pk=None):
+        """Mark a Looking Ahead moment as past; preserves the note in `original_looking_ahead_note`."""
+        moment = self.get_object()
+        if not can_edit_moment(request.user, moment):
+            return Response(
+                {"detail": "You do not have permission to convert this moment."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if moment.moment_type != Moment.MOMENT_TYPE_LOOKING_AHEAD:
+            return Response(
+                {"detail": "Only Looking Ahead entries can be converted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        reflection = request.data.get("reflection", "")
+        if not isinstance(reflection, str):
+            reflection = ""
+        moment.original_looking_ahead_note = moment.reflection
+        moment.moment_type = Moment.MOMENT_TYPE_PAST
+        moment.reflection = reflection
+        moment.save()
+        serializer = MomentSerializer(moment, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class MomentPhotoViewSet(ModelViewSet):
