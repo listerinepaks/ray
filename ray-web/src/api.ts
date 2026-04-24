@@ -172,6 +172,52 @@ export async function fetchProfileByPerson(personId: number): Promise<Profile> {
   return res.json() as Promise<Profile>
 }
 
+export type Friendship = {
+  id: number
+  requester_id: number
+  requester_username: string
+  requester_avatar?: string | null
+  addressee_id: number
+  addressee_username: string
+  addressee_avatar?: string | null
+  status: 'pending' | 'accepted'
+  direction: 'incoming' | 'outgoing'
+  created_at: string
+  accepted_at: string | null
+}
+
+export type FriendshipList = {
+  accepted: Friendship[]
+  pending_incoming: Friendship[]
+  pending_outgoing: Friendship[]
+}
+
+export async function fetchFriendships(): Promise<FriendshipList> {
+  const base = getApiBase()
+  const res = await fetch(`${base}/api/friends/`, {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(await parseErrorBody(res))
+  return res.json() as Promise<FriendshipList>
+}
+
+export async function acceptFriendRequest(friendshipId: number): Promise<Friendship> {
+  await ensureCsrfCookie()
+  const token = getCsrfTokenFromDocument()
+  const base = getApiBase()
+  const res = await fetch(`${base}/api/friends/requests/${friendshipId}/accept/`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { 'X-CSRFToken': token } : {}),
+    },
+  })
+  if (!res.ok) throw new Error(await parseErrorBody(res))
+  return res.json() as Promise<Friendship>
+}
+
 export type MomentPhoto = {
   id: number
   image: string

@@ -670,8 +670,8 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(244, 201, 93, 0.45)',
-    backgroundColor: 'rgba(244, 201, 93, 0.12)',
+    borderColor: 'rgba(242, 169, 123, 0.52)',
+    backgroundColor: 'rgba(242, 169, 123, 0.16)',
     gap: 6,
   },
   lookingLabel: {
@@ -679,7 +679,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    backgroundColor: 'rgba(244, 201, 93, 0.35)',
+    backgroundColor: 'rgba(242, 169, 123, 0.42)',
   },
   lookingLabelText: {
     fontFamily: fonts.sansSemiBold,

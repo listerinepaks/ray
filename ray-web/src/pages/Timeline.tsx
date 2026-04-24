@@ -13,14 +13,16 @@ type Props = {
   moments: Moment[]
   loading: boolean
   error: string | null
+  /** When the feed filter has no rows (e.g. Friends) — show this instead of the empty-state hero. */
+  emptyHint?: string | null
 }
 
 function formatKindLabel(kind: string): string {
   return kind === 'sunrise' ? 'Sunrise' : kind === 'sunset' ? 'Sunset' : kind
 }
 
-export function Timeline({ moments, loading, error }: Props) {
-  const showEmptyHero = !loading && !error && moments.length === 0
+export function Timeline({ moments, loading, error, emptyHint = null }: Props) {
+  const showEmptyHero = !loading && !error && moments.length === 0 && !emptyHint
 
   return (
     <>
@@ -41,6 +43,10 @@ export function Timeline({ moments, loading, error }: Props) {
           <strong>Could not load moments.</strong> {error}
         </div>
       )}
+
+      {!loading && !error && moments.length === 0 && emptyHint ? (
+        <p className="muted timeline-tab-empty">{emptyHint}</p>
+      ) : null}
 
       <ul className="moments">
         {moments.map((m) => {
@@ -70,7 +76,14 @@ export function Timeline({ moments, loading, error }: Props) {
                       {posterName.slice(0, 1).toUpperCase()}
                     </span>
                   )}
-                  <span className="moment-card-poster-name">{posterName}</span>
+                  <div className="moment-card-poster-main">
+                    <div className="moment-card-poster-row">
+                      <span className="moment-card-poster-name">{posterName}</span>
+                      {m.moment_type === 'looking_ahead' ? (
+                        <span className="moment-card-looking-label">Looking ahead</span>
+                      ) : null}
+                    </div>
+                  </div>
                 </div>
                 {thumb ? (
                   <div className="moment-card-thumb">
@@ -87,14 +100,13 @@ export function Timeline({ moments, loading, error }: Props) {
                 ) : (
                   <div className="moment-card-placeholder" aria-hidden />
                 )}
+                {m.moment_type === 'looking_ahead' && m.countdown_phrase ? (
+                  <div className="moment-card-countdown-under-thumb" role="status">
+                    {m.countdown_phrase}
+                  </div>
+                ) : null}
                 <div className="moment-card-body">
                   <div className="moment-head">
-                    {m.moment_type === 'looking_ahead' ? (
-                      <span className="moment-card-looking-label">Looking ahead</span>
-                    ) : null}
-                    {m.countdown_phrase ? (
-                      <span className="moment-card-countdown">{m.countdown_phrase}</span>
-                    ) : null}
                     <span className="kind">{formatKindLabel(m.kind)}</span>
                     <span className="date">{formatSmartDate(m.date)}</span>
                     {m.my_access ? (

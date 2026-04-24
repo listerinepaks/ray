@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import {
   fetchProfile,
+  fetchFriendships,
   fetchMe,
   fetchMoments,
   mediaUrl,
   postLogin,
   postLogout,
+  type Friendship,
   type Me,
   type Moment,
   type Profile as ProfileType,
@@ -20,6 +22,8 @@ import { Profile } from './pages/Profile'
 import { Timeline } from './pages/Timeline'
 import './App.css'
 
+type FeedTab = 'all' | 'looking_ahead' | 'friends' | 'mentions'
+
 function App() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -28,6 +32,9 @@ function App() {
   const [moments, setMoments] = useState<Moment[]>([])
   const [loadingMoments, setLoadingMoments] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [feedTab, setFeedTab] = useState<FeedTab>('all')
+  const [friendUserIds, setFriendUserIds] = useState<Set<number>>(() => new Set())
+  const [pendingIncoming, setPendingIncoming] = useState<Friendship[]>([])
   const [loginError, setLoginError] = useState<string | null>(null)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -58,8 +65,23 @@ function App() {
       try {
         setLoadingMoments(true)
         setError(null)
-        const list = await fetchMoments()
-        if (!cancelled) setMoments(list)
+        const [list, friendships] = await Promise.all([
+          fetchMoments(),
+          fetchFriendships().catch(() => null),
+        ])
+        if (cancelled) return
+        setMoments(list)
+        if (friendships) {
+          const accepted = new Set<number>()
+          for (const row of friendships.accepted) {
+            accepted.add(row.requester_id === user.id ? row.addressee_id : row.requester_id)
+          }
+          setFriendUserIds(accepted)
+          setPendingIncoming(friendships.pending_incoming ?? [])
+        } else {
+          setFriendUserIds(new Set())
+          setPendingIncoming([])
+        }
       } catch (e) {
         if (!cancelled)
           setError(e instanceof Error ? e.message : 'Could not load moments.')
@@ -90,6 +112,35 @@ function App() {
       cancelled = true
     }
   }, [user])
+
+  const visibleMoments = useMemo(() => {
+    if (!user) return []
+    if (feedTab === 'looking_ahead') {
+      return moments.filter((m) => m.moment_type === 'looking_ahead')
+    }
+    if (feedTab === 'friends') return moments.filter((m) => friendUserIds.has(m.author))
+    if (feedTab === 'mentions') {
+      return moments.filter((m) =>
+        m.tagged_people.some(
+          (p) =>
+            (user.id != null && p.linked_user === user.id) ||
+            (profile?.person_id != null && p.id === profile.person_id),
+        ),
+      )
+    }
+    return moments
+  }, [user, feedTab, friendUserIds, moments, profile?.person_id])
+
+  const feedEmptyHint = useMemo(() => {
+    if (!user || loadingMoments || error) return null
+    if (visibleMoments.length > 0) return null
+    if (feedTab === 'looking_ahead') return 'No looking-ahead moments yet.'
+    if (feedTab === 'friends') return 'No friend moments yet.'
+    if (feedTab === 'mentions') return 'No moments mention you yet.'
+    return null
+  }, [user, loadingMoments, error, visibleMoments.length, feedTab])
+
+  const onHome = location.pathname === '/'
 
   useEffect(() => {
     if (!accountMenuOpen) return
@@ -137,6 +188,9 @@ function App() {
     setUser(null)
     setProfile(null)
     setMoments([])
+    setFeedTab('all')
+    setFriendUserIds(new Set())
+    setPendingIncoming([])
     setAccountMenuOpen(false)
     navigate('/', { replace: true })
   }
@@ -198,7 +252,7 @@ function App() {
   }
 
   return (
-    <div className="app">
+    <div className={`app${onHome ? ' app--with-feed-tabs' : ''}`}>
       <header className="header">
         <div className="header-row">
           <div className="brand-lockup">
@@ -260,7 +314,12 @@ function App() {
         <Route
           path="/"
           element={
-            <Timeline moments={moments} loading={loadingMoments} error={error} />
+            <Timeline
+              moments={visibleMoments}
+              loading={loadingMoments}
+              error={error}
+              emptyHint={feedEmptyHint}
+            />
           }
         />
         <Route path="/profile" element={<Profile />} />
@@ -270,6 +329,95 @@ function App() {
         <Route path="/moments/:id" element={<EntryView currentUser={user} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
+      {onHome ? (
+        <nav className="feed-tabs-float" aria-label="Feed filter">
+          <button
+            type="button"
+            className={`feed-tab-btn${feedTab === 'all' ? ' feed-tab-btn--on' : ''}`}
+            aria-pressed={feedTab === 'all'}
+            aria-label="All moments"
+            onClick={() => setFeedTab('all')}
+          >
+            <svg className="feed-tab-icon" width={20} height={20} viewBox="0 0 24 24" aria-hidden>
+              <rect x="3" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.75" />
+              <rect x="14" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.75" />
+              <rect x="3" y="14" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.75" />
+              <rect x="14" y="14" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.75" />
+            </svg>
+            <span className="sr-only">All</span>
+          </button>
+          {/*
+            Icon alternatives: hourglass (pending), calendar (date), telescope (gaze), flag (milestone).
+            Mobile uses sparkles-outline in ray-mobile/app/(app)/index.tsx.
+          */}
+          <button
+            type="button"
+            className={`feed-tab-btn${feedTab === 'looking_ahead' ? ' feed-tab-btn--on' : ''}`}
+            aria-pressed={feedTab === 'looking_ahead'}
+            aria-label="Looking ahead moments"
+            onClick={() => setFeedTab('looking_ahead')}
+          >
+            <svg className="feed-tab-icon" width={20} height={20} viewBox="0 0 24 24" aria-hidden>
+              <path
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 4.5L12 7.5M12 16.5L12 19.5M5.5 12L8.5 12M15.5 12L18.5 12M6.7 6.7L8.95 8.95M15.05 15.05L17.3 17.3M17.3 6.7L15.05 8.95M8.95 15.05L6.7 17.3M18.5 5.5v2.5M17.25 6.75h2.5M5.5 17.5v2.5M4.25 18.75h2.5"
+              />
+            </svg>
+            <span className="sr-only">Looking ahead</span>
+          </button>
+          <button
+            type="button"
+            className={`feed-tab-btn${feedTab === 'friends' ? ' feed-tab-btn--on' : ''}`}
+            aria-pressed={feedTab === 'friends'}
+            aria-label="Friends moments"
+            onClick={() => setFeedTab('friends')}
+          >
+            <span className="feed-tab-inner">
+              <svg className="feed-tab-icon" width={20} height={20} viewBox="0 0 24 24" aria-hidden>
+                <circle cx="9" cy="7" r="4" fill="none" stroke="currentColor" strokeWidth="1.75" />
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                  d="M3 21v-1.2A5 5 0 0 1 8 15h2a5 5 0 0 1 5 4.8V21"
+                />
+                <circle cx="17" cy="11" r="3" fill="none" stroke="currentColor" strokeWidth="1.75" />
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                  d="M21 21v-0.8a4 4 0 0 0-3-3.9"
+                />
+              </svg>
+              {pendingIncoming.length > 0 ? (
+                <span className="feed-tab-badge" aria-label={`${pendingIncoming.length} pending friend requests`}>
+                  {pendingIncoming.length > 9 ? '9+' : String(pendingIncoming.length)}
+                </span>
+              ) : null}
+            </span>
+            <span className="sr-only">Friends</span>
+          </button>
+          <button
+            type="button"
+            className={`feed-tab-btn${feedTab === 'mentions' ? ' feed-tab-btn--on' : ''}`}
+            aria-pressed={feedTab === 'mentions'}
+            aria-label="Mentioned moments"
+            onClick={() => setFeedTab('mentions')}
+          >
+            <span className="feed-tab-mention-char" aria-hidden>
+              @
+            </span>
+            <span className="sr-only">Mentions</span>
+          </button>
+        </nav>
+      ) : null}
 
       {user.groups?.includes('love') ? (
         <div className="floating-love-heart" aria-hidden>

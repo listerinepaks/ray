@@ -40,7 +40,7 @@ function formatKindLabel(kind: string): string {
   return kind === 'sunrise' ? 'Sunrise' : kind === 'sunset' ? 'Sunset' : kind;
 }
 
-type FeedTab = 'all' | 'friends' | 'mentions';
+type FeedTab = 'all' | 'looking_ahead' | 'friends' | 'mentions';
 
 export default function TimelineScreen() {
   const insets = useSafeAreaInsets();
@@ -184,6 +184,9 @@ export default function TimelineScreen() {
   }, [navigation, profile?.avatar, profile?.display_name, router, user?.username]);
 
   const visibleMoments = useMemo(() => {
+    if (feedTab === 'looking_ahead') {
+      return moments.filter((m) => m.moment_type === 'looking_ahead');
+    }
     if (feedTab === 'friends') return moments.filter((m) => friendUserIds.has(m.author));
     if (feedTab === 'mentions') {
       return moments.filter((m) =>
@@ -204,7 +207,7 @@ export default function TimelineScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: Math.max(insets.bottom + 92, 112) },
+          { paddingBottom: Math.max(insets.bottom + 100, 120) },
         ]}
         refreshControl={
           <RefreshControl
@@ -305,11 +308,13 @@ export default function TimelineScreen() {
 
       {!loading && !error && visibleMoments.length === 0 ? (
         <Text style={styles.muted}>
-          {feedTab === 'friends'
-            ? 'No friend moments yet.'
-            : feedTab === 'mentions'
-              ? 'No moments mention you yet.'
-              : 'No moments yet — create one to get started.'}
+          {feedTab === 'looking_ahead'
+            ? 'No looking-ahead moments yet.'
+            : feedTab === 'friends'
+              ? 'No friend moments yet.'
+              : feedTab === 'mentions'
+                ? 'No moments mention you yet.'
+                : 'No moments yet — create one to get started.'}
         </Text>
       ) : null}
 
@@ -332,7 +337,11 @@ export default function TimelineScreen() {
                 m.moment_type === 'looking_ahead' && styles.cardLookingAhead,
                 pressed && { opacity: 0.98 },
               ]}>
-              <View style={styles.cardPoster}>
+              <View
+                style={[
+                  styles.cardPoster,
+                  m.moment_type === 'looking_ahead' && styles.cardPosterLookingAhead,
+                ]}>
                 {posterAvatarUri ? (
                   <Image source={{ uri: posterAvatarUri }} style={styles.cardPosterAvatar} />
                 ) : (
@@ -342,9 +351,18 @@ export default function TimelineScreen() {
                     </Text>
                   </View>
                 )}
-                <Text style={styles.cardPosterName} numberOfLines={1}>
-                  {posterName}
-                </Text>
+                <View style={styles.cardPosterMain}>
+                  <View style={styles.cardPosterTopRow}>
+                    <Text style={styles.cardPosterName} numberOfLines={1}>
+                      {posterName}
+                    </Text>
+                    {m.moment_type === 'looking_ahead' ? (
+                      <View style={styles.lookingLabelInline} accessibilityLabel="Looking ahead">
+                        <Text style={styles.lookingLabelInlineText}>Looking ahead</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
               </View>
               {thumb ? (
                 <View style={styles.thumbWrap}>
@@ -358,17 +376,12 @@ export default function TimelineScreen() {
               ) : (
                 <View style={styles.placeholder} />
               )}
+              {m.moment_type === 'looking_ahead' && m.countdown_phrase ? (
+                <View style={styles.cardCountdownUnderThumb}>
+                  <Text style={styles.cardThumbCountdown}>{m.countdown_phrase}</Text>
+                </View>
+              ) : null}
               <View style={styles.cardBody}>
-                {m.moment_type === 'looking_ahead' ? (
-                  <View style={styles.cardLookingMeta}>
-                    <View style={styles.lookingLabel}>
-                      <Text style={styles.lookingLabelText}>Looking ahead</Text>
-                    </View>
-                    {m.countdown_phrase ? (
-                      <Text style={styles.cardCountdown}>{m.countdown_phrase}</Text>
-                    ) : null}
-                  </View>
-                ) : null}
                 <View style={styles.cardHead}>
                   <Text style={styles.kind}>{formatKindLabel(m.kind)}</Text>
                   <Text style={styles.date}>{formatSmartDate(m.date)}</Text>
@@ -434,8 +447,24 @@ export default function TimelineScreen() {
           style={[styles.feedTabBtn, feedTab === 'all' && styles.feedTabBtnOn]}>
           <Ionicons
             name="albums-outline"
-            size={18}
+            size={17}
             color={feedTab === 'all' ? theme.textPrimary : theme.textSecondary}
+          />
+        </Pressable>
+        <Pressable
+          onPress={() => setFeedTab('looking_ahead')}
+          accessibilityRole="tab"
+          accessibilityLabel="Looking ahead moments"
+          accessibilityState={{ selected: feedTab === 'looking_ahead' }}
+          style={[styles.feedTabBtn, feedTab === 'looking_ahead' && styles.feedTabBtnOn]}>
+          {/*
+            Icon alternatives (Ionicons): hourglass-outline (pending), calendar-outline (future date),
+            telescope-outline (forward gaze), flag-outline (milestone), navigate-outline (journey).
+          */}
+          <Ionicons
+            name="sparkles-outline"
+            size={17}
+            color={feedTab === 'looking_ahead' ? theme.textPrimary : theme.textSecondary}
           />
         </Pressable>
         <Pressable
@@ -447,7 +476,7 @@ export default function TimelineScreen() {
           <View style={styles.feedTabInner}>
             <Ionicons
               name="people-outline"
-              size={18}
+              size={17}
               color={feedTab === 'friends' ? theme.textPrimary : theme.textSecondary}
             />
             {pendingIncoming.length > 0 ? (
@@ -467,7 +496,7 @@ export default function TimelineScreen() {
           style={[styles.feedTabBtn, feedTab === 'mentions' && styles.feedTabBtnOn]}>
           <Ionicons
             name="at-outline"
-            size={18}
+            size={17}
             color={feedTab === 'mentions' ? theme.textPrimary : theme.textSecondary}
           />
         </Pressable>
@@ -576,34 +605,28 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...timelineCardShadow,
   },
+  /** Peach (#f2a97b) — full-card cue for Looking ahead */
   cardLookingAhead: {
-    backgroundColor: '#fffefb',
-    borderColor: 'rgba(244, 201, 93, 0.45)',
+    backgroundColor: 'rgba(242, 169, 123, 0.16)',
+    borderColor: 'rgba(242, 169, 123, 0.52)',
   },
-  lookingLabel: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+  cardPosterLookingAhead: {
+    borderBottomColor: 'rgba(242, 169, 123, 0.38)',
+  },
+  /** Inline “Looking ahead” pill beside author name (timeline poster row). */
+  lookingLabelInline: {
+    flexShrink: 0,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
     borderRadius: 6,
-    backgroundColor: 'rgba(244, 201, 93, 0.35)',
+    backgroundColor: 'rgba(242, 169, 123, 0.42)',
   },
-  lookingLabelText: {
+  lookingLabelInlineText: {
     fontFamily: fonts.sansSemiBold,
-    fontSize: 10,
-    letterSpacing: 0.6,
+    fontSize: 9,
+    letterSpacing: 0.55,
     textTransform: 'uppercase',
     color: theme.textSecondary,
-  },
-  cardCountdown: {
-    fontFamily: fonts.sansSemiBold,
-    fontSize: 13,
-    color: theme.accentPeach,
-  },
-  cardLookingMeta: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
   },
   cardPoster: {
     flexDirection: 'row',
@@ -614,6 +637,28 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(47, 47, 47, 0.1)',
+  },
+  cardPosterMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  cardPosterTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 0,
+  },
+  cardCountdownUnderThumb: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(242, 169, 123, 0.12)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(242, 169, 123, 0.35)',
+  },
+  cardThumbCountdown: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 14,
+    color: theme.accentPeach,
   },
   cardPosterAvatar: {
     width: 36,
@@ -638,6 +683,7 @@ const styles = StyleSheet.create({
   },
   cardPosterName: {
     flex: 1,
+    minWidth: 0,
     fontFamily: fonts.sansSemiBold,
     fontSize: 15,
     color: theme.textPrimary,
