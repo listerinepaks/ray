@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AspectFitImage } from '@/components/AspectFitImage';
+import { RayLogo } from '@/components/RayLogo';
 import { useAuth } from '@/contexts/AuthContext';
 import { fonts, theme } from '@/constants/theme';
 import { formatSmartDate } from '@/lib/formatSmartDate';
@@ -169,29 +170,46 @@ export default function TimelineScreen() {
     const avatarUri = mediaUrl(profile?.avatar);
     const avatarLabel = profile?.display_name || user?.username || '?';
     navigation.setOptions({
+      title: '',
+      headerLeftContainerStyle: styles.headerEdgeContainer,
+      headerRightContainerStyle: styles.headerEdgeContainer,
       headerLeft: () => (
         <Pressable
-          onPress={() => router.push('/profile')}
+          onPress={() => router.push('/')}
           hitSlop={12}
-          style={styles.headerAvatarButton}>
-          {avatarUri ? (
-            <Image source={{ uri: avatarUri }} style={styles.headerAvatarImage} />
-          ) : (
-            <View style={styles.headerAvatarFallback}>
-              <Text style={styles.headerAvatarLetter}>
-                {avatarLabel.slice(0, 1).toUpperCase()}
-              </Text>
-            </View>
-          )}
+          accessibilityRole="button"
+          accessibilityLabel="Ray home"
+          style={styles.headerLogoButton}>
+          <RayLogo scale={0.82} />
         </Pressable>
       ),
       headerRight: () => (
-        <Pressable
-          onPress={() => router.push('/moment/new')}
-          hitSlop={12}
-          style={{ paddingHorizontal: 4, paddingVertical: 8 }}>
-          <Text style={styles.headerNew}>New moment</Text>
-        </Pressable>
+        <View style={styles.headerRightRow}>
+          <Pressable
+            onPress={() => router.push('/moment/new')}
+            hitSlop={12}
+            style={styles.headerNewButton}
+            accessibilityRole="button"
+            accessibilityLabel="New moment">
+            <Text style={styles.headerNew}>New moment</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/profile')}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Profile"
+            style={styles.headerAvatarButton}>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={styles.headerAvatarImage} />
+            ) : (
+              <View style={styles.headerAvatarFallback}>
+                <Text style={styles.headerAvatarLetter}>
+                  {avatarLabel.slice(0, 1).toUpperCase()}
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        </View>
       ),
     });
   }, [navigation, profile?.avatar, profile?.display_name, router, user?.username]);
@@ -618,12 +636,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 2,
   },
+  headerEdgeContainer: {
+    paddingHorizontal: 4,
+  },
+  headerLogoButton: {
+    justifyContent: 'center',
+    paddingVertical: 4,
+    marginLeft: Platform.OS === 'ios' ? 4 : 0,
+  },
+  headerRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginRight: Platform.OS === 'ios' ? 4 : 0,
+  },
+  headerNewButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 2,
+  },
   headerAvatarButton: {
     width: 38,
     height: 38,
     borderRadius: 19,
     overflow: 'hidden',
-    marginLeft: 4,
     backgroundColor: theme.bgSecondary,
     borderWidth: 1,
     borderColor: theme.cardBorder,
