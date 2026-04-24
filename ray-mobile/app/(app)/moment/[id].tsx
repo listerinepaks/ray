@@ -372,6 +372,8 @@ export default function MomentEntryScreen() {
     `${formatKindLabel(moment.kind)} · ${formatSmartDate(moment.date)}`;
   const posterName = moment.author_username ?? `user_${moment.author}`;
   const posterAvatarUri = moment.author_avatar ? mediaUrl(moment.author_avatar) : '';
+  const profileHref =
+    currentUser && moment.author === currentUser.id ? '/profile' : `/profile/${moment.author}`;
 
   return (
     <KeyboardAvoidingView
@@ -383,7 +385,9 @@ export default function MomentEntryScreen() {
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 28) }}
         keyboardShouldPersistTaps="handled">
         <View style={styles.pad}>
-        <View style={styles.detailPoster}>
+        <Pressable
+          onPress={() => router.push(profileHref)}
+          style={({ pressed }) => [styles.detailPoster, pressed && { opacity: 0.92 }]}>
           {posterAvatarUri ? (
             <Image source={{ uri: posterAvatarUri }} style={styles.detailPosterAvatar} />
           ) : (
@@ -406,7 +410,7 @@ export default function MomentEntryScreen() {
               ) : null}
             </View>
           </View>
-        </View>
+        </Pressable>
 
         {hero ? (
           <Pressable
