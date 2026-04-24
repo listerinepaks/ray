@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -107,6 +107,7 @@ function formatCommentTime(iso: string): string {
 export default function MomentEntryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const navigation = useNavigation();
   const { user: currentUser } = useAuth();
   const { id: raw } = useLocalSearchParams<{ id: string }>();
   const id = useMemo(() => {
@@ -277,6 +278,35 @@ export default function MomentEntryScreen() {
     );
   }
 
+  const openOwnerMenu = useCallback(() => {
+    if (!moment || moment.my_access !== 'edit') return;
+    Alert.alert('Moment actions', undefined, [
+      {
+        text: 'Edit moment',
+        onPress: () => router.push(`/moment/edit/${moment.id}`),
+      },
+      {
+        text: 'Take this with you',
+        onPress: () => router.push(`/moment/share/${moment.id}`),
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [moment, router]);
+
+  useLayoutEffect(() => {
+    if (moment?.my_access === 'edit') {
+      navigation.setOptions({
+        headerRight: () => (
+          <Pressable onPress={openOwnerMenu} hitSlop={12} style={styles.headerMenuBtn}>
+            <Ionicons name="ellipsis-vertical" size={18} color={theme.textSecondary} />
+          </Pressable>
+        ),
+      });
+      return;
+    }
+    navigation.setOptions({ headerRight: undefined });
+  }, [moment?.my_access, navigation, openOwnerMenu]);
+
   if (loading) {
     return (
       <View style={[styles.center, { paddingTop: insets.top }]}>
@@ -317,41 +347,6 @@ export default function MomentEntryScreen() {
       style={styles.root}
       contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 28) }}>
       <View style={styles.pad}>
-        {(moment.my_access === 'edit' || moment.my_access) ? (
-          <View style={styles.nav}>
-            <View style={styles.navSpacer} />
-            <View style={styles.navRight}>
-              {moment.moment_type === 'looking_ahead' &&
-              moment.my_access === 'edit' &&
-              isOnOrBeforeToday(moment.date) ? (
-                <Pressable
-                  onPress={() => void onConvertLookingAhead()}
-                  disabled={convertBusy}
-                  hitSlop={8}>
-                  <Text style={[styles.navAction, styles.convertNavBtn]}>
-                    {convertBusy ? 'Opening…' : 'We lived this'}
-                  </Text>
-                </Pressable>
-              ) : null}
-              {moment.my_access === 'edit' ? (
-                <Pressable onPress={() => router.push(`/moment/edit/${moment.id}`)} hitSlop={8}>
-                  <Text style={styles.navAction}>Edit moment</Text>
-                </Pressable>
-              ) : null}
-              {moment.my_access === 'edit' ? (
-                <Pressable onPress={() => router.push(`/moment/share/${moment.id}`)} hitSlop={8}>
-                  <Text style={styles.navActionQuiet}>Take this with you</Text>
-                </Pressable>
-              ) : null}
-              {moment.my_access ? (
-                <View style={styles.accessPill}>
-                  <Text style={styles.accessPillText}>{moment.my_access}</Text>
-                </View>
-              ) : null}
-            </View>
-          </View>
-        ) : null}
-
         <View style={styles.detailPoster}>
           {posterAvatarUri ? (
             <Image source={{ uri: posterAvatarUri }} style={styles.detailPosterAvatar} />
@@ -391,6 +386,20 @@ export default function MomentEntryScreen() {
                   ~{formatKindLabel(moment.kind).toLowerCase()}{' '}
                   {formatCalculatedLight(moment.calculated_light_at)}
                 </Text>
+              ) : null}
+              {moment.my_access === 'edit' && isOnOrBeforeToday(moment.date) ? (
+                <Pressable
+                  onPress={() => void onConvertLookingAhead()}
+                  disabled={convertBusy}
+                  hitSlop={8}
+                  style={({ pressed }) => [
+                    styles.lookingConvertBtn,
+                    pressed && !convertBusy && { opacity: 0.9 },
+                  ]}>
+                  <Text style={styles.lookingConvertBtnText}>
+                    {convertBusy ? 'Opening…' : 'We lived this'}
+                  </Text>
+                </Pressable>
               ) : null}
             </View>
           ) : null}
@@ -461,7 +470,6 @@ export default function MomentEntryScreen() {
 
         {moment.my_access ? (
           <View style={styles.social}>
-            <Text style={styles.sectionLabel}>Reactions</Text>
             {socialError ? (
               <Text style={styles.socialError} accessibilityRole="alert">
                 {socialError}
@@ -489,16 +497,16 @@ export default function MomentEntryScreen() {
                     {busy ? (
                       <ActivityIndicator size="small" color={theme.textSecondary} />
                     ) : (
-                      <>
+                      <View style={styles.reactionBtnContent}>
                         <Ionicons
                           name={icon}
-                          size={22}
+                          size={18}
                           color={mine ? theme.accentDusk : theme.textSecondary}
                         />
                         <Text style={[styles.reactionCount, mine && styles.reactionCountMine]}>
                           {count}
                         </Text>
-                      </>
+                      </View>
                     )}
                   </Pressable>
                 );
@@ -507,8 +515,6 @@ export default function MomentEntryScreen() {
             {!canCommentOrReact ? (
               <Text style={styles.socialHint}>View-only: you can see reactions but not add your own.</Text>
             ) : null}
-
-            <Text style={[styles.sectionLabel, styles.commentsHeading]}>Comments</Text>
             {comments.length === 0 ? (
               <Text style={styles.noComments}>No comments yet.</Text>
             ) : (
@@ -593,34 +599,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.textSecondary,
   },
-  nav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  navSpacer: { flex: 1 },
-  navRight: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'flex-end' },
-  navAction: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: theme.textSecondary },
-  navActionQuiet: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 13,
-    color: theme.textMuted,
-  },
-  convertNavBtn: { color: theme.accentPeach },
-  accessPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: theme.pillBg,
-  },
-  accessPillText: {
-    fontFamily: fonts.sansSemiBold,
-    fontSize: 12,
-    color: theme.pillFg,
-    textTransform: 'lowercase',
+  headerMenuBtn: {
+    paddingHorizontal: 4,
+    paddingVertical: 8,
   },
   detailPoster: {
     flexDirection: 'row',
@@ -706,6 +687,19 @@ const styles = StyleSheet.create({
   lookingSun: {
     fontFamily: fonts.sansMedium,
     fontSize: 14,
+    color: theme.textSecondary,
+  },
+  lookingConvertBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(242, 169, 123, 0.32)',
+  },
+  lookingConvertBtnText: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 13,
     color: theme.textSecondary,
   },
   meta: {
@@ -815,42 +809,42 @@ const styles = StyleSheet.create({
   reactionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 8,
+    gap: 8,
+    marginBottom: 6,
   },
   reactionBtn: {
-    minWidth: 72,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    minWidth: 0,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: theme.cardBorder,
-    backgroundColor: theme.cardBg,
+    borderColor: 'rgba(47, 47, 47, 0.12)',
+    backgroundColor: 'rgba(47, 47, 47, 0.03)',
     alignItems: 'center',
-    gap: 4,
   },
   reactionBtnMine: {
     borderColor: theme.accentDusk,
-    backgroundColor: 'rgba(201, 75, 106, 0.08)',
+    backgroundColor: 'rgba(167, 183, 201, 0.24)',
   },
+  reactionBtnContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   reactionBtnDisabled: { opacity: 0.55 },
   reactionCount: {
     fontFamily: fonts.sansSemiBold,
-    fontSize: 13,
+    fontSize: 12,
     color: theme.textSecondary,
   },
   reactionCountMine: { color: theme.accentDusk },
-  commentsHeading: { marginTop: 20 },
   noComments: {
     fontFamily: fonts.sansRegular,
-    fontSize: 15,
+    fontSize: 14,
     color: theme.textMuted,
-    marginBottom: 12,
+    marginTop: 8,
+    marginBottom: 10,
   },
-  commentList: { gap: 12, marginBottom: 14 },
+  commentList: { gap: 10, marginTop: 8, marginBottom: 12 },
   commentCard: {
-    padding: 14,
-    borderRadius: 14,
+    padding: 11,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: theme.cardBorder,
     backgroundColor: theme.cardBg,
@@ -860,29 +854,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'baseline',
     gap: 8,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   commentAuthor: {
     fontFamily: fonts.sansSemiBold,
-    fontSize: 14,
+    fontSize: 13,
     color: theme.textPrimary,
     flex: 1,
   },
   commentTime: {
     fontFamily: fonts.sansMedium,
-    fontSize: 12,
+    fontSize: 11,
     color: theme.textMuted,
   },
   commentBody: {
     fontFamily: fonts.sansRegular,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 20,
     color: theme.textPrimary,
   },
-  commentDelete: { alignSelf: 'flex-start', marginTop: 8 },
+  commentDelete: { alignSelf: 'flex-start', marginTop: 6 },
   commentDeleteText: {
     fontFamily: fonts.sansSemiBold,
-    fontSize: 13,
+    fontSize: 12,
     color: theme.textSecondary,
   },
   commentComposer: { gap: 10, marginTop: 4 },
