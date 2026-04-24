@@ -1,5 +1,5 @@
 from django.db import IntegrityError
-from django.db.models import Count, OuterRef, Subquery
+from django.db.models import Count, OuterRef, Q, Subquery
 from django.http import Http404
 from django.contrib.auth import get_user_model
 from rest_framework import status
@@ -142,16 +142,33 @@ class ProfilePersonView(APIView):
 
     def get(self, request, person_id: int):
         person = (
-            Person.objects.filter(
-                id=person_id,
-                moments__moment__access_list__user=request.user,
-            )
+            Person.objects.filter(id=person_id)
             .select_related("linked_user")
-            .distinct()
             .first()
         )
         if person is None:
             raise Http404
+
+        if person.linked_user_id == request.user.id:
+            serializer = PersonProfileSerializer(person, context={"request": request})
+            return Response(serializer.data)
+
+        has_shared_moment_access = Moment.objects.filter(
+            access_list__user=request.user,
+            people__person=person,
+        ).exists()
+        is_accepted_friend = (
+            person.linked_user_id is not None
+            and Friendship.objects.filter(status=Friendship.STATUS_ACCEPTED)
+            .filter(
+                Q(requester=request.user, addressee_id=person.linked_user_id)
+                | Q(addressee=request.user, requester_id=person.linked_user_id)
+            )
+            .exists()
+        )
+        if not has_shared_moment_access and not is_accepted_friend:
+            raise Http404
+
         serializer = PersonProfileSerializer(person, context={"request": request})
         return Response(serializer.data)
 

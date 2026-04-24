@@ -212,6 +212,10 @@ export default function FriendsScreen() {
     return <AvatarChip uri={mediaUrl(rel)} label={username} />;
   }
 
+  function openProfileForUser(userId: number) {
+    router.push(`/profile/${userId}`);
+  }
+
   return (
     <ScrollView
       style={styles.root}
@@ -249,8 +253,13 @@ export default function FriendsScreen() {
           <Text style={styles.sectionTitle}>Requests</Text>
           {filteredIncoming.map((f) => (
             <View key={f.id} style={styles.row}>
-              {rowAvatar(f.requester_id, f.requester_username, f.requester_avatar)}
-              <Text style={styles.rowName}>{f.requester_username}</Text>
+              <Pressable
+                onPress={() => openProfileForUser(f.requester_id)}
+                style={styles.rowPerson}
+                hitSlop={6}>
+                {rowAvatar(f.requester_id, f.requester_username, f.requester_avatar)}
+                <Text style={styles.rowName}>{f.requester_username}</Text>
+              </Pressable>
               <Pressable disabled={busy} onPress={() => void onAccept(f.id)} style={styles.secondaryBtn}>
                 <Text style={styles.secondaryBtnText}>Accept</Text>
               </Pressable>
@@ -264,8 +273,13 @@ export default function FriendsScreen() {
           <Text style={styles.sectionTitle}>Pending</Text>
           {filteredOutgoing.map((f) => (
             <View key={f.id} style={styles.row}>
-              {rowAvatar(f.addressee_id, f.addressee_username, f.addressee_avatar)}
-              <Text style={styles.rowName}>{f.addressee_username}</Text>
+              <Pressable
+                onPress={() => openProfileForUser(f.addressee_id)}
+                style={styles.rowPerson}
+                hitSlop={6}>
+                {rowAvatar(f.addressee_id, f.addressee_username, f.addressee_avatar)}
+                <Text style={styles.rowName}>{f.addressee_username}</Text>
+              </Pressable>
               <Pressable
                 disabled={busy}
                 onPress={() => void onRemoveOrCancel(f.addressee_id)}
@@ -288,8 +302,10 @@ export default function FriendsScreen() {
             const rel = oid === f.requester_id ? f.requester_avatar : f.addressee_avatar;
             return (
               <View key={f.id} style={styles.row}>
-                {rowAvatar(oid, name, rel)}
-                <Text style={styles.rowName}>{name}</Text>
+                <Pressable onPress={() => openProfileForUser(oid)} style={styles.rowPerson} hitSlop={6}>
+                  {rowAvatar(oid, name, rel)}
+                  <Text style={styles.rowName}>{name}</Text>
+                </Pressable>
                 <Pressable disabled={busy} onPress={() => void onRemoveOrCancel(oid)} style={styles.secondaryBtn}>
                   <Text style={styles.secondaryBtnText}>Remove</Text>
                 </Pressable>
@@ -306,8 +322,10 @@ export default function FriendsScreen() {
         ) : (
           friendCandidates.map((u) => (
             <View key={u.id} style={styles.row}>
-              {rowAvatar(u.id, u.username)}
-              <Text style={styles.rowName}>{u.username}</Text>
+              <Pressable onPress={() => openProfileForUser(u.id)} style={styles.rowPerson} hitSlop={6}>
+                {rowAvatar(u.id, u.username)}
+                <Text style={styles.rowName}>{u.username}</Text>
+              </Pressable>
               <Pressable disabled={busy} onPress={() => void onSend(u.id)} style={styles.secondaryBtn}>
                 <Text style={styles.secondaryBtnText}>Request</Text>
               </Pressable>
@@ -360,6 +378,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.cardBg,
   },
   rowName: { flex: 1, fontFamily: fonts.sansMedium, fontSize: 15, color: theme.textPrimary },
+  rowPerson: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 },
   avatarWrap: { marginRight: 2 },
   avatarImg: {
     width: 40,
