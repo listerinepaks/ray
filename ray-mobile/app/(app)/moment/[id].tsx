@@ -1,10 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -88,6 +91,7 @@ const REACTION_TYPES = [
   { type: 'glow', icon: 'sparkles' as const, label: 'Glow' },
   { type: 'wow', icon: 'flash' as const, label: 'Wow' },
 ] as const;
+const DOUBLE_TAP_WINDOW_MS = 300;
 
 function formatCommentTime(iso: string): string {
   try {
@@ -106,6 +110,7 @@ function formatCommentTime(iso: string): string {
 
 export default function MomentEntryScreen() {
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const router = useRouter();
   const navigation = useNavigation();
   const { user: currentUser } = useAuth();
@@ -127,6 +132,9 @@ export default function MomentEntryScreen() {
   const [reactionBusy, setReactionBusy] = useState<string | null>(null);
   const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null);
   const [convertBusy, setConvertBusy] = useState(false);
+  const [showHeartOverlay, setShowHeartOverlay] = useState(false);
+  const lastHeroTapAtRef = useRef(0);
+  const heartOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (id == null) {
@@ -236,6 +244,29 @@ export default function MomentEntryScreen() {
     }
   }
 
+  function onHeroDoubleTapLike() {
+    if (!canCommentOrReact || reactionBusy) return;
+    const now = Date.now();
+    if (now - lastHeroTapAtRef.current <= DOUBLE_TAP_WINDOW_MS) {
+      lastHeroTapAtRef.current = 0;
+      if (heartOverlayTimerRef.current) clearTimeout(heartOverlayTimerRef.current);
+      setShowHeartOverlay(true);
+      heartOverlayTimerRef.current = setTimeout(() => {
+        setShowHeartOverlay(false);
+        heartOverlayTimerRef.current = null;
+      }, 700);
+      void onToggleReaction('heart');
+      return;
+    }
+    lastHeroTapAtRef.current = now;
+  }
+
+  useEffect(() => {
+    return () => {
+      if (heartOverlayTimerRef.current) clearTimeout(heartOverlayTimerRef.current);
+    };
+  }, []);
+
   async function onDeleteComment(commentId: number) {
     if (!moment) return;
     setDeletingCommentId(commentId);
@@ -343,10 +374,15 @@ export default function MomentEntryScreen() {
   const posterAvatarUri = moment.author_avatar ? mediaUrl(moment.author_avatar) : '';
 
   return (
-    <ScrollView
+    <KeyboardAvoidingView
       style={styles.root}
-      contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 28) }}>
-      <View style={styles.pad}>
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={headerHeight}>
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 28) }}
+        keyboardShouldPersistTaps="handled">
+        <View style={styles.pad}>
         <View style={styles.detailPoster}>
           {posterAvatarUri ? (
             <Image source={{ uri: posterAvatarUri }} style={styles.detailPosterAvatar} />
@@ -357,27 +393,49 @@ export default function MomentEntryScreen() {
               </Text>
             </View>
           )}
-          <Text style={styles.detailPosterName} numberOfLines={1}>
-            {posterName}
-          </Text>
+          <View style={styles.detailPosterMain}>
+            <View style={styles.detailPosterTopRow}>
+              <Text style={styles.detailPosterName} numberOfLines={1}>
+                {posterName}
+              </Text>
+              {moment.moment_type === 'looking_ahead' ? (
+                <View style={styles.lookingLabelInline} accessibilityLabel="Looking ahead">
+                  <Ionicons name="sparkles-outline" size={11} color={theme.textSecondary} />
+                  <Text style={styles.lookingLabelInlineText}>Looking ahead</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
         </View>
 
         {hero ? (
-          <View style={styles.hero}>
+          <Pressable
+            onPress={onHeroDoubleTapLike}
+            disabled={!canCommentOrReact || reactionBusy != null}
+            style={[
+              styles.hero,
+              moment.moment_type === 'looking_ahead' && styles.heroLookingAhead,
+            ]}>
             <AspectFitImage
               uri={mediaUrl(hero.image)}
               accessibilityLabel={hero.caption || displayTitle}
             />
+            {showHeartOverlay ? (
+              <View pointerEvents="none" style={styles.heartOverlay}>
+                <Ionicons name="heart" size={52} color="#fff" />
+              </View>
+            ) : null}
             {hero.caption ? <Text style={styles.heroCaption}>{hero.caption}</Text> : null}
-          </View>
+          </Pressable>
         ) : null}
 
-        <View style={styles.content}>
+        <View
+          style={[
+            styles.content,
+            moment.moment_type === 'looking_ahead' && styles.contentLookingAhead,
+          ]}>
           {moment.moment_type === 'looking_ahead' ? (
             <View style={styles.lookingBand} accessibilityRole="summary">
-              <View style={styles.lookingLabel}>
-                <Text style={styles.lookingLabelText}>Looking ahead</Text>
-              </View>
               {moment.countdown_phrase ? (
                 <Text style={styles.lookingCountdown}>{moment.countdown_phrase}</Text>
               ) : null}
@@ -574,8 +632,9 @@ export default function MomentEntryScreen() {
             ) : null}
           </View>
         ) : null}
-      </View>
-    </ScrollView>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -612,6 +671,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(47, 47, 47, 0.1)',
   },
+  detailPosterMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  detailPosterTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 0,
+  },
   detailPosterAvatar: {
     width: 36,
     height: 36,
@@ -639,11 +708,39 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: theme.textPrimary,
   },
+  lookingLabelInline: {
+    flexShrink: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: 'rgba(242, 169, 123, 0.42)',
+  },
+  lookingLabelInlineText: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 9,
+    letterSpacing: 0.55,
+    textTransform: 'uppercase',
+    color: theme.textSecondary,
+  },
   hero: {
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: theme.bgSecondary,
     marginBottom: 20,
+  },
+  heroLookingAhead: {
+    borderWidth: 1,
+    borderColor: 'rgba(242, 169, 123, 0.52)',
+    backgroundColor: 'rgba(242, 169, 123, 0.12)',
+  },
+  heartOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.16)',
   },
   heroCaption: {
     paddingHorizontal: 14,
@@ -656,12 +753,17 @@ const styles = StyleSheet.create({
     borderTopColor: theme.cardBorder,
   },
   content: { marginBottom: 8 },
+  contentLookingAhead: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(242, 169, 123, 0.52)',
+    backgroundColor: 'rgba(242, 169, 123, 0.12)',
+    padding: 12,
+  },
   lookingBand: {
     marginBottom: 14,
     padding: 12,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(242, 169, 123, 0.52)',
     backgroundColor: 'rgba(242, 169, 123, 0.16)',
     gap: 6,
   },

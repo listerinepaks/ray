@@ -221,10 +221,6 @@ export default function FriendsScreen() {
         paddingBottom: Math.max(insets.bottom, 28),
         paddingHorizontal: 20,
       }}>
-      <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backRow}>
-        <Text style={styles.backText}>Back</Text>
-      </Pressable>
-
       <Text style={styles.title}>Friends</Text>
 
       <View style={styles.field}>
@@ -325,8 +321,6 @@ export default function FriendsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.bgPrimary },
-  backRow: { alignSelf: 'flex-start', marginBottom: 8 },
-  backText: { fontFamily: fonts.sansSemiBold, fontSize: 16, color: theme.textSecondary },
   title: { fontFamily: fonts.serifSemi, fontSize: 26, color: theme.textPrimary, marginBottom: 14 },
   field: { gap: 6, marginBottom: 16 },
   label: { fontFamily: fonts.sansMedium, fontSize: 14, color: theme.textSecondary },

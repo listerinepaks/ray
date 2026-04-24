@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { useRouter, useNavigation } from 'expo-router';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -41,6 +42,7 @@ function formatKindLabel(kind: string): string {
 }
 
 type FeedTab = 'all' | 'looking_ahead' | 'friends' | 'mentions';
+const FEED_STALE_MS = 30_000;
 
 export default function TimelineScreen() {
   const insets = useSafeAreaInsets();
@@ -59,6 +61,7 @@ export default function TimelineScreen() {
   const [pendingIncoming, setPendingIncoming] = useState<Friendship[]>([]);
   const [friendRequestBusyId, setFriendRequestBusyId] = useState<number | null>(null);
   const [friendRequestError, setFriendRequestError] = useState<string | null>(null);
+  const lastLoadedAtRef = useRef<number>(0);
 
   const load = useCallback(async () => {
     setError(null);
@@ -72,6 +75,7 @@ export default function TimelineScreen() {
         accepted.add(row.requester_id === user?.id ? row.addressee_id : row.requester_id);
       }
       setFriendUserIds(accepted);
+      lastLoadedAtRef.current = Date.now();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load moments.');
     } finally {
@@ -99,6 +103,15 @@ export default function TimelineScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (loading || refreshing) return;
+      const ageMs = Date.now() - lastLoadedAtRef.current;
+      if (lastLoadedAtRef.current > 0 && ageMs < FEED_STALE_MS) return;
+      void load();
+    }, [load, loading, refreshing]),
+  );
 
   useEffect(() => {
     if (!user) {

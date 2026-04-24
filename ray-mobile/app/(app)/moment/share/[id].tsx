@@ -1,10 +1,12 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useHeaderHeight } from '@react-navigation/elements';
 import * as Sharing from 'expo-sharing';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -72,6 +74,7 @@ function formatSoftWhenLine(moment: Moment): string {
 
 export default function MemoryShareScreen() {
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const router = useRouter();
   const { id: raw } = useLocalSearchParams<{ id: string }>();
   const id = useMemo(() => {
@@ -211,15 +214,19 @@ export default function MemoryShareScreen() {
   }
 
   return (
-    <ScrollView
+    <KeyboardAvoidingView
       style={styles.root}
-      contentContainerStyle={{
-        paddingBottom: Math.max(insets.bottom, 28),
-        paddingHorizontal: 18,
-        paddingTop: 8,
-      }}
-      keyboardShouldPersistTaps="handled">
-      <Text style={styles.lede}>A single image to save or send — only what you choose appears on it.</Text>
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={headerHeight}>
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={{
+          paddingBottom: Math.max(insets.bottom, 28),
+          paddingHorizontal: 18,
+          paddingTop: 8,
+        }}
+        keyboardShouldPersistTaps="handled">
+        <Text style={styles.lede}>A single image to save or send — only what you choose appears on it.</Text>
 
       <View
         ref={captureRefView}
@@ -291,23 +298,24 @@ export default function MemoryShareScreen() {
         </View>
       ) : null}
 
-      <Pressable
-        onPress={() => void onShare()}
-        disabled={sharing || Platform.OS === 'web'}
-        style={({ pressed }) => [
-          styles.shareBtn,
-          (sharing || Platform.OS === 'web') && styles.shareBtnDisabled,
-          pressed && !sharing && Platform.OS !== 'web' && { opacity: 0.92 },
-        ]}>
-        {sharing ? (
-          <ActivityIndicator color={theme.textPrimary} size="small" />
-        ) : (
-          <Text style={styles.shareBtnText}>
-            {Platform.OS === 'web' ? 'Use the app to share' : 'Save or share image…'}
-          </Text>
-        )}
-      </Pressable>
-    </ScrollView>
+        <Pressable
+          onPress={() => void onShare()}
+          disabled={sharing || Platform.OS === 'web'}
+          style={({ pressed }) => [
+            styles.shareBtn,
+            (sharing || Platform.OS === 'web') && styles.shareBtnDisabled,
+            pressed && !sharing && Platform.OS !== 'web' && { opacity: 0.92 },
+          ]}>
+          {sharing ? (
+            <ActivityIndicator color={theme.textPrimary} size="small" />
+          ) : (
+            <Text style={styles.shareBtnText}>
+              {Platform.OS === 'web' ? 'Use the app to share' : 'Save or share image…'}
+            </Text>
+          )}
+        </Pressable>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
