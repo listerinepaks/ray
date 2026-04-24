@@ -77,6 +77,9 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
   const [loadingRefs, setLoadingRefs] = useState(true)
 
   const [kind, setKind] = useState<'sunrise' | 'sunset' | 'other'>('sunrise')
+  /** New moments only; edits keep server `moment_type` (Looking Ahead → past uses convert). */
+  const [momentType, setMomentType] = useState<'past' | 'looking_ahead'>('past')
+  const [loadedMomentType, setLoadedMomentType] = useState<'past' | 'looking_ahead' | null>(null)
   const [date, setDate] = useState(todayDateString)
   const [observedAt, setObservedAt] = useState('')
   const [title, setTitle] = useState('')
@@ -140,6 +143,9 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
           return
         }
         setKind(m.kind === 'sunset' ? 'sunset' : m.kind === 'other' ? 'other' : 'sunrise')
+        const mt = m.moment_type === 'looking_ahead' ? 'looking_ahead' : 'past'
+        setMomentType(mt)
+        setLoadedMomentType(mt)
         setDate(m.date)
         setObservedAt(m.observed_at ? toDatetimeLocal(m.observed_at) : '')
         setTitle(m.title)
@@ -312,6 +318,9 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
       reflection: reflection.trim() || undefined,
       location_name: locationName.trim() || undefined,
     }
+    if (!isEdit) {
+      payload.moment_type = momentType
+    }
     if (observedAt.trim()) {
       const d = new Date(observedAt)
       if (!Number.isNaN(d.getTime())) payload.observed_at = d.toISOString()
@@ -443,7 +452,10 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
               Photos
             </h2>
             <p className="photos-hint">
-              Start here — large, honest images work best. {isEdit ? 'Add new images; edit captions or remove existing.' : 'You can reorder before saving.'}
+              {(isEdit && loadedMomentType === 'looking_ahead') ||
+              (!isEdit && momentType === 'looking_ahead')
+                ? 'Optional inspiration — a photo can help everyone picture the light and place you’re hoping for.'
+                : `Start here — large, honest images work best. ${isEdit ? 'Add new images; edit captions or remove existing.' : 'You can reorder before saving.'}`}
             </p>
             <label
               className="photo-drop"
@@ -615,6 +627,45 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
             </div>
           </section>
 
+          <section className="create-section" aria-labelledby="sec-moment-type">
+            <h2 id="sec-moment-type" className="create-section-title">
+              Memory or anticipation
+            </h2>
+            {isEdit && loadedMomentType === 'looking_ahead' ? (
+              <p className="create-moment-type-readonly">
+                <span className="looking-ahead-pill">Looking ahead</span> This entry is something you’re
+                planning together. When it happens, open it from the journal and choose{' '}
+                <strong>We lived this</strong> to turn it into a past moment.
+              </p>
+            ) : isEdit ? (
+              <p className="create-moment-type-readonly muted">Past moment</p>
+            ) : (
+              <div className="moment-type-grid" role="group" aria-label="Past or looking ahead">
+                <button
+                  type="button"
+                  className={`moment-type-card ${momentType === 'past' ? 'is-selected' : ''}`}
+                  onClick={() => setMomentType('past')}
+                >
+                  <span className="moment-type-card-title">Something we lived</span>
+                  <span className="moment-type-card-body">
+                    A sunrise, sunset, or moment that already happened — with photos and reflection.
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className={`moment-type-card ${momentType === 'looking_ahead' ? 'is-selected' : ''}`}
+                  onClick={() => setMomentType('looking_ahead')}
+                >
+                  <span className="moment-type-card-title">Something to look forward to</span>
+                  <span className="moment-type-card-body">
+                    A future light you hope to share — date, place, who you hope is there, and why it
+                    matters.
+                  </span>
+                </button>
+              </div>
+            )}
+          </section>
+
           <section className="create-section" aria-labelledby="sec-story">
             <h2 id="sec-story" className="create-section-title">
               Story
@@ -640,12 +691,22 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
               />
             </label>
             <label className="create-field">
-              <span>Reflection</span>
+              <span>
+                {(isEdit && loadedMomentType === 'looking_ahead') ||
+                (!isEdit && momentType === 'looking_ahead')
+                  ? 'Note (why this matters)'
+                  : 'Reflection'}
+              </span>
               <textarea
                 value={reflection}
                 onChange={(e) => setReflection(e.target.value)}
                 rows={6}
-                placeholder="What stayed with you?"
+                placeholder={
+                  (isEdit && loadedMomentType === 'looking_ahead') ||
+                  (!isEdit && momentType === 'looking_ahead')
+                    ? 'What you hope to share, remember, or feel together…'
+                    : 'What stayed with you?'
+                }
               />
             </label>
             <label className="create-field create-field-place">

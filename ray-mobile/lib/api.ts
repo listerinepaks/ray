@@ -171,12 +171,16 @@ export type Moment = {
   author_username?: string;
   /** Relative media path when author has a linked Person with a profile photo */
   author_avatar?: string | null;
+  moment_type?: 'past' | 'looking_ahead' | string;
+  countdown_phrase?: string | null;
   kind: string;
   date: string;
   observed_at: string | null;
+  calculated_light_at?: string | null;
   title: string;
   bible_verse: string;
   reflection: string;
+  original_looking_ahead_note?: string;
   location_name: string;
   latitude: string | null;
   longitude: string | null;
@@ -412,6 +416,7 @@ export async function removeFriend(userId: number): Promise<void> {
 
 export type CreateMomentPayload = {
   kind: string;
+  moment_type?: 'past' | 'looking_ahead';
   date: string;
   observed_at?: string | null;
   title?: string;
@@ -442,6 +447,20 @@ export async function updateMoment(id: number, payload: CreateMomentPayload): Pr
     method: 'PATCH',
     headers: baseHeaders(true),
     body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await parseErrorBody(res));
+  return res.json() as Promise<Moment>;
+}
+
+export async function postConvertMoment(
+  id: number,
+  body: { reflection?: string } = {},
+): Promise<Moment> {
+  const base = getApiBase();
+  const res = await fetch(`${base}/api/moments/${id}/convert/`, {
+    method: 'POST',
+    headers: baseHeaders(true),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await parseErrorBody(res));
   return res.json() as Promise<Moment>;

@@ -52,7 +52,10 @@ export function Timeline({ moments, loading, error }: Props) {
           const posterAvatar = m.author_avatar ? mediaUrl(m.author_avatar) : ''
           return (
             <li key={m.id}>
-              <Link className="moment-card" to={`/moments/${m.id}`}>
+              <Link
+                className={`moment-card${m.moment_type === 'looking_ahead' ? ' moment-card--looking-ahead' : ''}`}
+                to={`/moments/${m.id}`}
+              >
                 <div className="moment-card-poster">
                   {posterAvatar ? (
                     <img
@@ -86,6 +89,12 @@ export function Timeline({ moments, loading, error }: Props) {
                 )}
                 <div className="moment-card-body">
                   <div className="moment-head">
+                    {m.moment_type === 'looking_ahead' ? (
+                      <span className="moment-card-looking-label">Looking ahead</span>
+                    ) : null}
+                    {m.countdown_phrase ? (
+                      <span className="moment-card-countdown">{m.countdown_phrase}</span>
+                    ) : null}
                     <span className="kind">{formatKindLabel(m.kind)}</span>
                     <span className="date">{formatSmartDate(m.date)}</span>
                     {m.my_access ? (

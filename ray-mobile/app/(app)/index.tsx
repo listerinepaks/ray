@@ -327,7 +327,11 @@ export default function TimelineScreen() {
             <Pressable
               key={m.id}
               onPress={() => router.push(`/moment/${m.id}`)}
-              style={({ pressed }) => [styles.card, pressed && { opacity: 0.98 }]}>
+              style={({ pressed }) => [
+                styles.card,
+                m.moment_type === 'looking_ahead' && styles.cardLookingAhead,
+                pressed && { opacity: 0.98 },
+              ]}>
               <View style={styles.cardPoster}>
                 {posterAvatarUri ? (
                   <Image source={{ uri: posterAvatarUri }} style={styles.cardPosterAvatar} />
@@ -355,6 +359,16 @@ export default function TimelineScreen() {
                 <View style={styles.placeholder} />
               )}
               <View style={styles.cardBody}>
+                {m.moment_type === 'looking_ahead' ? (
+                  <View style={styles.cardLookingMeta}>
+                    <View style={styles.lookingLabel}>
+                      <Text style={styles.lookingLabelText}>Looking ahead</Text>
+                    </View>
+                    {m.countdown_phrase ? (
+                      <Text style={styles.cardCountdown}>{m.countdown_phrase}</Text>
+                    ) : null}
+                  </View>
+                ) : null}
                 <View style={styles.cardHead}>
                   <Text style={styles.kind}>{formatKindLabel(m.kind)}</Text>
                   <Text style={styles.date}>{formatSmartDate(m.date)}</Text>
@@ -561,6 +575,35 @@ const styles = StyleSheet.create({
     backgroundColor: theme.cardBg,
     overflow: 'hidden',
     ...timelineCardShadow,
+  },
+  cardLookingAhead: {
+    backgroundColor: '#fffefb',
+    borderColor: 'rgba(244, 201, 93, 0.45)',
+  },
+  lookingLabel: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: 'rgba(244, 201, 93, 0.35)',
+  },
+  lookingLabelText: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 10,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: theme.textSecondary,
+  },
+  cardCountdown: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 13,
+    color: theme.accentPeach,
+  },
+  cardLookingMeta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
   },
   cardPoster: {
     flexDirection: 'row',

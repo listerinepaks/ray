@@ -26,8 +26,8 @@ class MomentAccessInline(admin.TabularInline):
 
 @admin.register(Moment)
 class MomentAdmin(admin.ModelAdmin):
-    list_display = ("id", "kind", "date", "author", "visibility_mode", "created_at")
-    list_filter = ("kind", "visibility_mode")
+    list_display = ("id", "moment_type", "kind", "date", "author", "visibility_mode", "created_at")
+    list_filter = ("moment_type", "kind", "visibility_mode")
     search_fields = ("title", "bible_verse", "reflection", "location_name")
     inlines = [MomentPhotoInline, MomentPersonInline, MomentAccessInline]
 

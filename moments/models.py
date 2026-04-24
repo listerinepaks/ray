@@ -44,6 +44,13 @@ class Moment(models.Model):
         (KIND_OTHER, "Other"),
     ]
 
+    MOMENT_TYPE_PAST = "past"
+    MOMENT_TYPE_LOOKING_AHEAD = "looking_ahead"
+    MOMENT_TYPE_CHOICES = [
+        (MOMENT_TYPE_PAST, "Past"),
+        (MOMENT_TYPE_LOOKING_AHEAD, "Looking ahead"),
+    ]
+
     VISIBILITY_PRIVATE = "private"
     VISIBILITY_TAGGED = "tagged"
     VISIBILITY_CUSTOM = "custom"
@@ -60,9 +67,20 @@ class Moment(models.Model):
         on_delete=models.PROTECT,
         related_name="moments_authored",
     )
+    moment_type = models.CharField(
+        max_length=20,
+        choices=MOMENT_TYPE_CHOICES,
+        default=MOMENT_TYPE_PAST,
+        db_index=True,
+    )
     kind = models.CharField(max_length=20, choices=KIND_CHOICES)
     date = models.DateField()
     observed_at = models.DateTimeField(null=True, blank=True)
+    calculated_light_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Approximate local sunrise or sunset for this date and coordinates, when computable.",
+    )
     title = models.CharField(max_length=140, blank=True)
     bible_verse = models.CharField(
         max_length=300,
@@ -70,6 +88,10 @@ class Moment(models.Model):
         help_text="Optional Bible verse line (e.g. reference and text).",
     )
     reflection = models.TextField(blank=True)
+    original_looking_ahead_note = models.TextField(
+        blank=True,
+        help_text="Preserved note from before this entry became a past moment.",
+    )
     location_name = models.CharField(max_length=200, blank=True)
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
@@ -86,6 +108,17 @@ class Moment(models.Model):
 
     def __str__(self):
         return f"{self.get_kind_display()} on {self.date}"
+
+    def save(self, *args, **kwargs):
+        from .solar import compute_calculated_light_at
+
+        self.calculated_light_at = compute_calculated_light_at(
+            kind=self.kind,
+            moment_date=self.date,
+            latitude=self.latitude,
+            longitude=self.longitude,
+        )
+        super().save(*args, **kwargs)
 
 
 class MomentPhoto(models.Model):

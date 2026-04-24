@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -27,6 +28,7 @@ import {
   fetchMomentReactions,
   mediaUrl,
   MomentNotFoundError,
+  postConvertMoment,
   type Moment,
   type MomentComment,
   type MomentReaction,
@@ -43,6 +45,38 @@ function formatObserved(iso: string | null): string | null {
     if (Number.isNaN(d.getTime())) return null;
     return new Intl.DateTimeFormat(undefined, {
       timeStyle: 'short',
+    }).format(d);
+  } catch {
+    return null;
+  }
+}
+
+function parseYmdLocal(ymd: string): Date {
+  const parts = ymd.split('-').map(Number);
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return new Date(NaN);
+  const [y, mo, d] = parts;
+  return new Date(y!, mo! - 1, d!);
+}
+
+function isOnOrBeforeToday(ymd: string): boolean {
+  const t = parseYmdLocal(ymd);
+  if (Number.isNaN(t.getTime())) return false;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return t.getTime() <= today.getTime();
+}
+
+function formatCalculatedLight(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return null;
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
     }).format(d);
   } catch {
     return null;
@@ -91,6 +125,7 @@ export default function MomentEntryScreen() {
   const [postingComment, setPostingComment] = useState(false);
   const [reactionBusy, setReactionBusy] = useState<string | null>(null);
   const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null);
+  const [convertBusy, setConvertBusy] = useState(false);
 
   useEffect(() => {
     if (id == null) {
@@ -214,6 +249,34 @@ export default function MomentEntryScreen() {
     }
   }
 
+  async function onConvertLookingAhead() {
+    if (!moment) return;
+    Alert.alert(
+      'We lived this?',
+      'Your note will be kept, and you can add how it felt and any photos on the next screen.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue',
+          onPress: () => {
+            void (async () => {
+              setConvertBusy(true);
+              setSocialError(null);
+              try {
+                await postConvertMoment(moment.id, { reflection: '' });
+                router.replace(`/moment/edit/${moment.id}`);
+              } catch (e) {
+                setSocialError(e instanceof Error ? e.message : 'Could not update this moment.');
+              } finally {
+                setConvertBusy(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }
+
   if (loading) {
     return (
       <View style={[styles.center, { paddingTop: insets.top }]}>
@@ -258,6 +321,18 @@ export default function MomentEntryScreen() {
           <View style={styles.nav}>
             <View style={styles.navSpacer} />
             <View style={styles.navRight}>
+              {moment.moment_type === 'looking_ahead' &&
+              moment.my_access === 'edit' &&
+              isOnOrBeforeToday(moment.date) ? (
+                <Pressable
+                  onPress={() => void onConvertLookingAhead()}
+                  disabled={convertBusy}
+                  hitSlop={8}>
+                  <Text style={[styles.navAction, styles.convertNavBtn]}>
+                    {convertBusy ? 'Opening…' : 'We lived this'}
+                  </Text>
+                </Pressable>
+              ) : null}
               {moment.my_access === 'edit' ? (
                 <Pressable onPress={() => router.push(`/moment/edit/${moment.id}`)} hitSlop={8}>
                   <Text style={styles.navAction}>Edit moment</Text>
@@ -298,6 +373,22 @@ export default function MomentEntryScreen() {
         ) : null}
 
         <View style={styles.content}>
+          {moment.moment_type === 'looking_ahead' ? (
+            <View style={styles.lookingBand} accessibilityRole="summary">
+              <View style={styles.lookingLabel}>
+                <Text style={styles.lookingLabelText}>Looking ahead</Text>
+              </View>
+              {moment.countdown_phrase ? (
+                <Text style={styles.lookingCountdown}>{moment.countdown_phrase}</Text>
+              ) : null}
+              {formatCalculatedLight(moment.calculated_light_at) ? (
+                <Text style={styles.lookingSun}>
+                  ~{formatKindLabel(moment.kind).toLowerCase()}{' '}
+                  {formatCalculatedLight(moment.calculated_light_at)}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
           <Text style={styles.meta}>
             <Text style={styles.metaKind}>{formatKindLabel(moment.kind)}</Text>
             <Text style={styles.metaSep}> · </Text>
@@ -326,6 +417,12 @@ export default function MomentEntryScreen() {
           ) : null}
           {moment.reflection ? (
             <Text style={styles.reflection}>{moment.reflection}</Text>
+          ) : null}
+          {moment.original_looking_ahead_note?.trim() ? (
+            <View style={styles.originalSection}>
+              <Text style={styles.sectionLabel}>What you were looking forward to</Text>
+              <Text style={styles.reflectionOriginal}>{moment.original_looking_ahead_note}</Text>
+            </View>
           ) : null}
         </View>
 
@@ -502,6 +599,7 @@ const styles = StyleSheet.create({
   navSpacer: { flex: 1 },
   navRight: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'flex-end' },
   navAction: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: theme.textSecondary },
+  convertNavBtn: { color: theme.accentPeach },
   accessPill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -567,6 +665,39 @@ const styles = StyleSheet.create({
     borderTopColor: theme.cardBorder,
   },
   content: { marginBottom: 8 },
+  lookingBand: {
+    marginBottom: 14,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(244, 201, 93, 0.45)',
+    backgroundColor: 'rgba(244, 201, 93, 0.12)',
+    gap: 6,
+  },
+  lookingLabel: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: 'rgba(244, 201, 93, 0.35)',
+  },
+  lookingLabelText: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 10,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: theme.textSecondary,
+  },
+  lookingCountdown: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 15,
+    color: theme.accentPeach,
+  },
+  lookingSun: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 14,
+    color: theme.textSecondary,
+  },
   meta: {
     fontFamily: fonts.sansMedium,
     fontSize: 13,
@@ -608,6 +739,15 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 26,
     color: theme.textPrimary,
+  },
+  originalSection: { marginTop: 22 },
+  reflectionOriginal: {
+    marginTop: 4,
+    fontFamily: fonts.sansRegular,
+    fontSize: 16,
+    lineHeight: 24,
+    color: theme.textSecondary,
+    fontStyle: 'italic',
   },
   gallery: { marginTop: 20, gap: 16 },
   galleryItem: {
