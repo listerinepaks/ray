@@ -1,4 +1,5 @@
 import re
+import sys
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
@@ -15,6 +16,11 @@ def _create_notification(**kwargs) -> None:
     try:
         notification = Notification.objects.create(**kwargs)
     except IntegrityError:
+        print(
+            "[RayPush] Notification skipped (duplicate dedupe_key); no push sent.",
+            file=sys.stderr,
+            flush=True,
+        )
         return
     _send_push(notification)
 
@@ -37,6 +43,12 @@ def _push_copy(notification: Notification) -> tuple[str, str]:
 
 
 def _send_push(notification: Notification) -> None:
+    print(
+        f"[RayPush] In-app notification created id={notification.id} type={notification.type} "
+        f"user_id={notification.user_id}; attempting push.",
+        file=sys.stderr,
+        flush=True,
+    )
     title, body = _push_copy(notification)
     target_url = "raymobile://notifications"
     if notification.moment_id:
