@@ -1,17 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 
 import {
+  fetchMoments,
   fetchPeople,
   fetchProfile,
   mediaUrl,
   updateProfile,
+  type Moment,
   type Person,
   type Profile as ProfileType,
 } from '../api'
 
 export function Profile() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const editMode = searchParams.get('edit') === '1'
   const [profile, setProfile] = useState<ProfileType | null>(null)
+  const [moments, setMoments] = useState<Moment[]>([])
   const [people, setPeople] = useState<Person[]>([])
   const [displayName, setDisplayName] = useState('')
   const [bio, setBio] = useState('')
@@ -29,10 +35,15 @@ export function Profile() {
       try {
         setLoading(true)
         setError(null)
-        const [data, sharedPeople] = await Promise.all([fetchProfile(), fetchPeople()])
+        const [data, sharedPeople, allMoments] = await Promise.all([
+          fetchProfile(),
+          fetchPeople(),
+          fetchMoments(),
+        ])
         if (cancelled) return
         setProfile(data)
         setPeople(sharedPeople)
+        setMoments(allMoments)
         setDisplayName(data.display_name)
         setBio(data.bio)
       } catch (e) {
@@ -111,6 +122,13 @@ export function Profile() {
 
   const avatarSrc = avatarPreview || mediaUrl(profile?.avatar)
   const claimablePeople = people.filter((p) => p.linked_user == null)
+  const authoredMoments = useMemo(() => {
+    if (!profile?.linked_user) return []
+    return moments
+      .filter((m) => m.author === profile.linked_user)
+      .slice()
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }, [moments, profile?.linked_user])
 
   return (
     <section className="profile-page">
@@ -129,6 +147,16 @@ export function Profile() {
           <h1>{profile?.display_name || profile?.username || 'Profile'}</h1>
         </div>
       </div>
+      <div className="profile-actions">
+        <Link className="btn-secondary" to="/?tab=friends">
+          Friends
+        </Link>
+        {!editMode ? (
+          <Link className="login-btn" to="/profile?edit=1#profile-edit">
+            Edit profile
+          </Link>
+        ) : null}
+      </div>
 
       {loading ? <p className="muted">Loading profile…</p> : null}
       {error ? (
@@ -138,8 +166,62 @@ export function Profile() {
       ) : null}
 
       {profile ? (
-        <form className="profile-form" onSubmit={onSubmit}>
+        <>
           <div className="profile-card">
+            {profile.bio ? (
+              <div className="profile-readonly-field">
+                <span>Bio</span>
+                <textarea value={profile.bio} rows={4} readOnly />
+              </div>
+            ) : (
+              <p className="muted">No bio added yet.</p>
+            )}
+            <div className="profile-stats">
+              <div className="profile-stat">
+                <strong>{profile.moments_authored}</strong>
+                <span>Moments written</span>
+              </div>
+              <div className="profile-stat">
+                <strong>{profile.moments_shared_with_me}</strong>
+                <span>Moments shared with you</span>
+              </div>
+            </div>
+          </div>
+
+          <section className="profile-moments" aria-label="Your moments">
+            <h2 className="profile-moments-title">Moments</h2>
+            {authoredMoments.length === 0 ? (
+              <p className="muted profile-moments-hint">No moments to show yet.</p>
+            ) : (
+              <div className="profile-moments-grid">
+                {authoredMoments.map((m) => {
+                  const photos = m.photos ?? []
+                  const thumb = photos.length
+                    ? [...photos].sort((a, b) => a.sort_order - b.sort_order)[0]
+                    : null
+                  return (
+                    <Link
+                      key={m.id}
+                      className="profile-moment-tile"
+                      to={`/moments/${m.id}`}
+                      aria-label={`Open moment ${m.id}`}>
+                      {thumb ? (
+                        <img src={mediaUrl(thumb.image)} alt="" loading="lazy" />
+                      ) : (
+                        <span className="profile-moment-tile-fallback">No photo</span>
+                      )}
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+        </>
+      ) : null}
+
+      {profile && editMode ? (
+        <form className="profile-form" onSubmit={onSubmit}>
+          <div className="profile-card" id="profile-edit">
             {profile.person_id == null ? (
               <div className="profile-claim">
                 <p className="profile-claim-title">Claim an existing person</p>
@@ -225,6 +307,16 @@ export function Profile() {
             <div className="profile-actions">
               <button type="submit" className="login-btn" disabled={saving}>
                 {saving ? 'Saving…' : 'Save profile'}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  const next = new URLSearchParams(searchParams)
+                  next.delete('edit')
+                  setSearchParams(next, { replace: true })
+                }}>
+                Done
               </button>
               {saveMessage ? <p className="profile-saved">{saveMessage}</p> : null}
             </div>

@@ -220,6 +220,39 @@ export async function acceptFriendRequest(friendshipId: number): Promise<Friends
   return res.json() as Promise<Friendship>
 }
 
+export async function sendFriendRequest(userId: number): Promise<Friendship> {
+  await ensureCsrfCookie()
+  const token = getCsrfTokenFromDocument()
+  const base = getApiBase()
+  const res = await fetch(`${base}/api/friends/requests/`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(token ? { 'X-CSRFToken': token } : {}),
+    },
+    body: JSON.stringify({ user_id: userId }),
+  })
+  if (!res.ok) throw new Error(await parseErrorBody(res))
+  return res.json() as Promise<Friendship>
+}
+
+export async function removeFriend(userId: number): Promise<void> {
+  await ensureCsrfCookie()
+  const token = getCsrfTokenFromDocument()
+  const base = getApiBase()
+  const res = await fetch(`${base}/api/friends/${userId}/`, {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { 'X-CSRFToken': token } : {}),
+    },
+  })
+  if (!res.ok) throw new Error(await parseErrorBody(res))
+}
+
 export type MomentPhoto = {
   id: number
   image: string

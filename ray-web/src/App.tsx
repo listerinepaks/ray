@@ -25,6 +25,13 @@ import './App.css'
 
 type FeedTab = 'all' | 'looking_ahead' | 'friends' | 'mentions'
 
+function parseFeedTabParam(value: string | null): FeedTab | null {
+  if (value === 'all' || value === 'looking_ahead' || value === 'friends' || value === 'mentions') {
+    return value
+  }
+  return null
+}
+
 function App() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -167,6 +174,13 @@ function App() {
   }, [user, loadingMoments, error, visibleMoments.length, feedTab])
 
   const onHome = location.pathname === '/'
+
+  useEffect(() => {
+    if (!onHome) return
+    const fromQuery = parseFeedTabParam(new URLSearchParams(location.search).get('tab'))
+    if (!fromQuery || fromQuery === feedTab) return
+    setFeedTab(fromQuery)
+  }, [feedTab, location.search, onHome])
 
   useEffect(() => {
     if (!accountMenuOpen) return
