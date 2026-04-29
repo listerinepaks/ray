@@ -85,16 +85,21 @@ class AuthUsersView(APIView):
         User = get_user_model()
         active_users = list(User.objects.filter(is_active=True).order_by("username")[:500])
         user_ids = [u.id for u in active_users]
+        people_by_user_id = {
+            row.linked_user_id: row
+            for row in Person.objects.filter(linked_user_id__in=user_ids).only("id", "linked_user_id", "profile_photo")
+        }
         avatar_by_user_id = {
-            row.linked_user_id: row.profile_photo.name
-            for row in Person.objects.filter(linked_user_id__in=user_ids).only("linked_user_id", "profile_photo")
-            if row.profile_photo
+            uid: person.profile_photo.name
+            for uid, person in people_by_user_id.items()
+            if person.profile_photo
         }
         users = [
             {
                 "id": u.id,
                 "username": u.username,
                 "avatar": avatar_by_user_id.get(u.id),
+                "person_id": people_by_user_id.get(u.id).id if people_by_user_id.get(u.id) else None,
             }
             for u in active_users
         ]

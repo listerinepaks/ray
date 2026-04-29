@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 import {
@@ -19,6 +20,17 @@ function otherUserId(row: Friendship, meId: number): number {
 
 function otherUsername(row: Friendship, meId: number): string {
   return row.requester_id === meId ? row.addressee_username : row.requester_username
+}
+
+function profilePathForFriendshipUser(row: Friendship, userId: number): string | null {
+  if (row.requester_id === userId) {
+    return row.requester_person_id ? `/people/${row.requester_person_id}` : null
+  }
+  return row.addressee_person_id ? `/people/${row.addressee_person_id}` : null
+}
+
+function profilePathForSharingUser(user: SharingUser): string | null {
+  return user.person_id ? `/people/${user.person_id}` : null
 }
 
 function AvatarChip({ uri, label }: { uri: string; label: string }) {
@@ -170,6 +182,23 @@ export function Friends({ meId }: { meId: number }) {
     return <AvatarChip uri={mediaUrl(rel)} label={username} />
   }
 
+  function PersonLink({
+    to,
+    className,
+    children,
+  }: {
+    to: string | null
+    className: string
+    children: ReactNode
+  }) {
+    if (!to) return <div className={className}>{children}</div>
+    return (
+      <Link to={to} className={className}>
+        {children}
+      </Link>
+    )
+  }
+
   return (
     <section className="friends-page">
       <h1 className="friends-title">Friends</h1>
@@ -198,10 +227,12 @@ export function Friends({ meId }: { meId: number }) {
           <h2 className="friends-section-title">Requests</h2>
           {filteredIncoming.map((f) => (
             <div key={f.id} className="friends-row">
-              <Link to={`/people/${f.requester_id}`} className="friends-row-person">
+              <PersonLink
+                to={profilePathForFriendshipUser(f, f.requester_id)}
+                className="friends-row-person">
                 {rowAvatar(f.requester_id, f.requester_username, f.requester_avatar)}
                 <span className="friends-row-name">{f.requester_username}</span>
-              </Link>
+              </PersonLink>
               <button disabled={busy} onClick={() => void onAccept(f.id)} className="btn-secondary" type="button">
                 Accept
               </button>
@@ -215,10 +246,12 @@ export function Friends({ meId }: { meId: number }) {
           <h2 className="friends-section-title">Pending</h2>
           {filteredOutgoing.map((f) => (
             <div key={f.id} className="friends-row">
-              <Link to={`/people/${f.addressee_id}`} className="friends-row-person">
+              <PersonLink
+                to={profilePathForFriendshipUser(f, f.addressee_id)}
+                className="friends-row-person">
                 {rowAvatar(f.addressee_id, f.addressee_username, f.addressee_avatar)}
                 <span className="friends-row-name">{f.addressee_username}</span>
-              </Link>
+              </PersonLink>
               <button
                 disabled={busy}
                 onClick={() => void onRemoveOrCancel(f.addressee_id)}
@@ -242,10 +275,12 @@ export function Friends({ meId }: { meId: number }) {
             const rel = oid === f.requester_id ? f.requester_avatar : f.addressee_avatar
             return (
               <div key={f.id} className="friends-row">
-                <Link to={`/people/${oid}`} className="friends-row-person">
+                <PersonLink
+                  to={profilePathForFriendshipUser(f, oid)}
+                  className="friends-row-person">
                   {rowAvatar(oid, name, rel)}
                   <span className="friends-row-name">{name}</span>
-                </Link>
+                </PersonLink>
                 <button
                   disabled={busy}
                   onClick={() => void onRemoveOrCancel(oid)}
@@ -266,10 +301,10 @@ export function Friends({ meId }: { meId: number }) {
         ) : (
           friendCandidates.map((u) => (
             <div key={u.id} className="friends-row">
-              <Link to={`/people/${u.id}`} className="friends-row-person">
+              <PersonLink to={profilePathForSharingUser(u)} className="friends-row-person">
                 {rowAvatar(u.id, u.username)}
                 <span className="friends-row-name">{u.username}</span>
-              </Link>
+              </PersonLink>
               <button disabled={busy} onClick={() => void onSend(u.id)} className="btn-secondary" type="button">
                 Request
               </button>

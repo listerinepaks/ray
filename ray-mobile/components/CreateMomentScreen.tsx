@@ -300,10 +300,48 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
     [shareUsers],
   );
 
-  const addPhotos = useCallback(async () => {
+  const applyPickedAssets = useCallback(
+    (assets: ImagePicker.ImagePickerAsset[]) => {
+      if (!assets.length) return;
+      const next: PhotoDraft[] = [];
+      for (const a of assets) {
+        const uri = a.uri;
+        const name = a.fileName ?? `photo-${next.length}.jpg`;
+        const type = a.mimeType ?? 'image/jpeg';
+        next.push({ key: newKey(), uri, caption: '', name, type });
+      }
+      setPhotos((prev) => [...prev, ...next]);
+
+      // Preload from first photo metadata if user hasn't already set these.
+      const firstWithMetadata = assets.map(getCapturedAtFromAsset).find(Boolean) ?? null;
+      if (firstWithMetadata) {
+        if (!dateEdited) setDate(formatDateInputFromDate(firstWithMetadata));
+        if (!observedAtEdited) setObservedAt(toDatetimeLocal(firstWithMetadata.toISOString()));
+      }
+    },
+    [dateEdited, observedAtEdited],
+  );
+
+  const capturePhoto = useCallback(async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (perm.status !== 'granted') {
+      setSubmitError('Camera permission is required to take photos.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      exif: true,
+      quality: 0.88,
+      cameraType: ImagePicker.CameraType.back,
+    });
+    if (result.canceled) return;
+    applyPickedAssets(result.assets);
+  }, [applyPickedAssets]);
+
+  const addPhotosFromLibrary = useCallback(async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (perm.status !== 'granted') {
-      setSubmitError('Photo library permission is required to add images.');
+      setSubmitError('Photo library permission is required to choose from your roll.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -313,22 +351,8 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
       quality: 0.88,
     });
     if (result.canceled) return;
-    const next: PhotoDraft[] = [];
-    for (const a of result.assets) {
-      const uri = a.uri;
-      const name = a.fileName ?? `photo-${next.length}.jpg`;
-      const type = a.mimeType ?? 'image/jpeg';
-      next.push({ key: newKey(), uri, caption: '', name, type });
-    }
-    setPhotos((prev) => [...prev, ...next]);
-
-    // Preload from first photo metadata if user hasn't already set these.
-    const firstWithMetadata = result.assets.map(getCapturedAtFromAsset).find(Boolean) ?? null;
-    if (firstWithMetadata) {
-      if (!dateEdited) setDate(formatDateInputFromDate(firstWithMetadata));
-      if (!observedAtEdited) setObservedAt(toDatetimeLocal(firstWithMetadata.toISOString()));
-    }
-  }, [dateEdited, observedAtEdited]);
+    applyPickedAssets(result.assets);
+  }, [applyPickedAssets]);
 
   const removePhoto = useCallback((key: string) => {
     setPhotos((prev) => prev.filter((p) => p.key !== key));
@@ -973,9 +997,14 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
             {(!isWizard || createStep === 'photos') ? (
               <>
             <Text style={styles.sectionTitle}>Photos</Text>
-            <Pressable onPress={() => void addPhotos()} style={styles.addPhotoBtn}>
-              <Text style={styles.addPhotoText}>Add photos</Text>
-            </Pressable>
+            <View style={styles.photoAddRow}>
+              <Pressable onPress={() => void capturePhoto()} style={[styles.addPhotoBtn, styles.addPhotoBtnPrimary]}>
+                <Text style={styles.addPhotoText}>Use camera</Text>
+              </Pressable>
+              <Pressable onPress={() => void addPhotosFromLibrary()} style={styles.addPhotoBtn}>
+                <Text style={styles.addPhotoText}>Choose from roll</Text>
+              </Pressable>
+            </View>
 
             {existingPhotos.map((ph) => (
               <View key={ph.id} style={styles.photoBlock}>
@@ -1393,7 +1422,7 @@ const styles = StyleSheet.create({
   accessChipTextOn: { color: theme.pillFg, fontFamily: fonts.sansSemiBold },
   remove: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: theme.error },
   addPhotoBtn: {
-    alignSelf: 'flex-start',
+    flex: 1,
     marginBottom: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -1401,6 +1430,15 @@ const styles = StyleSheet.create({
     backgroundColor: theme.bgSecondary,
     borderWidth: 1,
     borderColor: theme.cardBorder,
+  },
+  photoAddRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 2,
+  },
+  addPhotoBtnPrimary: {
+    backgroundColor: theme.accentGolden,
+    borderColor: 'rgba(244, 201, 93, 0.8)',
   },
   addPhotoText: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: theme.textPrimary },
   photoBlock: { marginBottom: 16, gap: 8 },

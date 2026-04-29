@@ -177,9 +177,11 @@ export async function fetchProfileByPerson(personId: number): Promise<Profile> {
 export type Friendship = {
   id: number
   requester_id: number
+  requester_person_id?: number | null
   requester_username: string
   requester_avatar?: string | null
   addressee_id: number
+  addressee_person_id?: number | null
   addressee_username: string
   addressee_avatar?: string | null
   status: 'pending' | 'accepted'
@@ -491,6 +493,7 @@ export async function createPerson(payload: { name: string; note?: string }): Pr
 
 export type SharingUser = {
   id: number
+  person_id?: number | null
   username: string
   /** Relative media path when the user has a linked Person with a profile photo */
   avatar?: string | null

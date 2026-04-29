@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "Ray Mobile",
+    "owner": "listerinepaks",
     "slug": "ray-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -17,6 +18,8 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Ray uses your location to show today's sunrise and sunset times.",
+        "NSCameraUsageDescription": "Ray uses your camera so you can capture photos for moments.",
+        "NSPhotoLibraryUsageDescription": "Ray uses your photo library so you can add photos to moments.",
         "NSUserNotificationUsageDescription": "Ray sends notifications for friend moments and social activity.",
         "ITSAppUsesNonExemptEncryption": false
       },
@@ -43,6 +46,7 @@
     "plugins": [
       "expo-router",
       "expo-location",
+      "expo-image-picker",
       "expo-notifications",
       "expo-secure-store",
       "@react-native-community/datetimepicker"

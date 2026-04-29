@@ -389,9 +389,11 @@ class MomentSerializer(serializers.ModelSerializer):
 
 class FriendshipSerializer(serializers.ModelSerializer):
     requester_id = serializers.IntegerField(source="requester.id", read_only=True)
+    requester_person_id = serializers.SerializerMethodField()
     requester_username = serializers.CharField(source="requester.username", read_only=True)
     requester_avatar = serializers.SerializerMethodField()
     addressee_id = serializers.IntegerField(source="addressee.id", read_only=True)
+    addressee_person_id = serializers.SerializerMethodField()
     addressee_username = serializers.CharField(source="addressee.username", read_only=True)
     addressee_avatar = serializers.SerializerMethodField()
     direction = serializers.SerializerMethodField()
@@ -401,9 +403,11 @@ class FriendshipSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "requester_id",
+            "requester_person_id",
             "requester_username",
             "requester_avatar",
             "addressee_id",
+            "addressee_person_id",
             "addressee_username",
             "addressee_avatar",
             "status",
@@ -417,8 +421,18 @@ class FriendshipSerializer(serializers.ModelSerializer):
         mapping = self.context.get("avatar_by_user_id") or {}
         return mapping.get(user_id)
 
+    def _person_id_for_user(self, user_id: int):
+        mapping = self.context.get("person_id_by_user_id") or {}
+        return mapping.get(user_id)
+
+    def get_requester_person_id(self, obj):
+        return self._person_id_for_user(obj.requester_id)
+
     def get_requester_avatar(self, obj):
         return self._avatar_for_user(obj.requester_id)
+
+    def get_addressee_person_id(self, obj):
+        return self._person_id_for_user(obj.addressee_id)
 
     def get_addressee_avatar(self, obj):
         return self._avatar_for_user(obj.addressee_id)
