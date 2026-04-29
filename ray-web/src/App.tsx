@@ -18,6 +18,7 @@ import { RayLogo } from './components/RayLogo'
 import { SparklesIcon } from './components/SparklesIcon'
 import { CreateMoment } from './pages/CreateMoment'
 import { EntryView } from './pages/EntryView'
+import { Friends } from './pages/Friends'
 import { PersonProfile } from './pages/PersonProfile'
 import { Profile } from './pages/Profile'
 import { Timeline } from './pages/Timeline'
@@ -365,6 +366,7 @@ function App() {
           }
         />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/friends" element={<Friends meId={user.id} />} />
         <Route path="/people/:id" element={<PersonProfile />} />
         <Route path="/moments/new" element={<CreateMoment currentUser={user} />} />
         <Route path="/moments/:id/edit" element={<CreateMoment currentUser={user} />} />

@@ -148,7 +148,7 @@ export function Profile() {
         </div>
       </div>
       <div className="profile-actions">
-        <Link className="btn-secondary" to="/?tab=friends">
+        <Link className="btn-secondary" to="/friends">
           Friends
         </Link>
         {!editMode ? (
