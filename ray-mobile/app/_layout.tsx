@@ -10,6 +10,8 @@ import {
 } from '@expo-google-fonts/playfair-display';
 import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
+import * as Linking from 'expo-linking';
+import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -51,6 +53,18 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded) SplashScreen.hideAsync();
   }, [loaded]);
+
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const url = response.notification.request.content.data?.url;
+      if (typeof url === 'string' && url.length > 0) {
+        void Linking.openURL(url);
+      }
+    });
+    return () => {
+      sub.remove();
+    };
+  }, []);
 
   if (!loaded) return null;
 

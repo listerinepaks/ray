@@ -2,6 +2,7 @@ from django.db import IntegrityError
 from django.db.models import Count, OuterRef, Q, Subquery
 from django.http import Http404
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -17,7 +18,14 @@ from .access import (
     resync_friends_moments_for_user,
     resync_tagged_moment_access_for_person,
 )
-from .models import Comment, Friendship, Moment, MomentPhoto, Person, Reaction
+from .models import Comment, Friendship, Moment, MomentPhoto, Person, PushDevice, Reaction
+from .notifications import (
+    notify_friend_posted,
+    notify_friend_request_accepted,
+    notify_friend_request_received,
+    notify_moment_commented,
+    notify_moment_reacted,
+)
 from .permissions import (
     CommentPermission,
     MomentEditPermission,
@@ -31,9 +39,11 @@ from .serializers import (
     FriendshipSerializer,
     MomentPhotoSerializer,
     MomentSerializer,
+    NotificationSerializer,
     PersonSerializer,
     PersonProfileSerializer,
     ProfileSerializer,
+    PushDeviceRegisterSerializer,
     ReactionSerializer,
 )
 
@@ -201,7 +211,8 @@ class MomentViewSet(ModelViewSet):
         )
 
     def perform_create(self, serializer):
-        serializer.save()
+        moment = serializer.save()
+        notify_friend_posted(moment)
 
     @action(detail=True, methods=["post"], url_path="convert")
     def convert(self, request, pk=None):
@@ -268,7 +279,8 @@ class CommentViewSet(ModelViewSet):
         moment = get_moment_for_nested_view(self)
         if moment is None:
             raise Http404
-        serializer.save(moment=moment, author=self.request.user)
+        comment = serializer.save(moment=moment, author=self.request.user)
+        notify_moment_commented(comment)
 
 
 class ReactionViewSet(ModelViewSet):
@@ -290,7 +302,8 @@ class ReactionViewSet(ModelViewSet):
         moment = get_moment_for_nested_view(self)
         if moment is None:
             raise Http404
-        serializer.save(moment=moment, user=self.request.user)
+        reaction = serializer.save(moment=moment, user=self.request.user)
+        notify_moment_reacted(moment, self.request.user.id, reaction.id)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -364,6 +377,7 @@ class FriendshipRequestCreateView(APIView):
             if existing.requester_id == request.user.id:
                 return Response({"detail": "A request is already pending."}, status=400)
             accepted = accept_friendship(existing)
+            notify_friend_request_accepted(accepted)
             return Response(
                 FriendshipSerializer(accepted, context={"request": request}).data,
                 status=status.HTTP_200_OK,
@@ -374,6 +388,7 @@ class FriendshipRequestCreateView(APIView):
             addressee_id=target_user_id,
             status=Friendship.STATUS_PENDING,
         )
+        notify_friend_request_received(friendship)
         return Response(
             FriendshipSerializer(friendship, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
@@ -390,6 +405,7 @@ class FriendshipAcceptView(APIView):
         if friendship.status == Friendship.STATUS_ACCEPTED:
             return Response({"detail": "Friend request already accepted."}, status=400)
         accepted = accept_friendship(friendship)
+        notify_friend_request_accepted(accepted)
         return Response(FriendshipSerializer(accepted, context={"request": request}).data)
 
 
@@ -409,4 +425,56 @@ class FriendshipDeleteView(APIView):
             # Friendship visibility is derived from accepted connections.
             # Rebuild both sides to remove friend-based access.
             resync_friends_moments_for_user(uid)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class NotificationListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        rows = (
+            request.user.notifications.select_related("actor")
+            .order_by("-created_at", "-id")[:100]
+        )
+        user_ids = {row.actor_id for row in rows}
+        avatar_by_user_id = {
+            p.linked_user_id: p.profile_photo.name
+            for p in Person.objects.filter(linked_user_id__in=user_ids).only("linked_user_id", "profile_photo")
+            if p.profile_photo
+        }
+        serializer = NotificationSerializer(
+            rows,
+            many=True,
+            context={"request": request, "avatar_by_user_id": avatar_by_user_id},
+        )
+        unread_count = request.user.notifications.filter(read_at__isnull=True).count()
+        return Response({"results": serializer.data, "unread_count": unread_count})
+
+
+class NotificationReadAllView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        request.user.notifications.filter(read_at__isnull=True).update(read_at=timezone.now())
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PushDeviceRegisterView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = PushDeviceRegisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        token = serializer.validated_data["expo_push_token"].strip()
+        platform = serializer.validated_data["platform"]
+        if not token.startswith("ExponentPushToken["):
+            return Response({"expo_push_token": ["Invalid Expo push token."]}, status=400)
+        PushDevice.objects.update_or_create(
+            expo_push_token=token,
+            defaults={
+                "user": request.user,
+                "platform": platform,
+                "enabled": True,
+            },
+        )
         return Response(status=status.HTTP_204_NO_CONTENT)

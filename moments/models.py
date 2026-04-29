@@ -287,3 +287,93 @@ class Reaction(models.Model):
                 name="unique_reaction_type_per_user_per_moment",
             )
         ]
+
+
+class Notification(models.Model):
+    TYPE_FRIEND_POSTED = "friend_posted"
+    TYPE_FRIEND_REQUEST_RECEIVED = "friend_request_received"
+    TYPE_FRIEND_REQUEST_ACCEPTED = "friend_request_accepted"
+    TYPE_MOMENT_COMMENTED = "moment_commented"
+    TYPE_MOMENT_REACTED = "moment_reacted"
+    TYPE_MENTIONED = "mentioned"
+    TYPE_CHOICES = [
+        (TYPE_FRIEND_POSTED, "Friend posted"),
+        (TYPE_FRIEND_REQUEST_RECEIVED, "Friend request received"),
+        (TYPE_FRIEND_REQUEST_ACCEPTED, "Friend request accepted"),
+        (TYPE_MOMENT_COMMENTED, "Moment commented"),
+        (TYPE_MOMENT_REACTED, "Moment reacted"),
+        (TYPE_MENTIONED, "Mentioned"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notifications_sent",
+    )
+    moment = models.ForeignKey(
+        Moment,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+        null=True,
+        blank=True,
+    )
+    comment = models.ForeignKey(
+        Comment,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+        null=True,
+        blank=True,
+    )
+    friendship = models.ForeignKey(
+        Friendship,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+        null=True,
+        blank=True,
+    )
+    type = models.CharField(max_length=40, choices=TYPE_CHOICES)
+    dedupe_key = models.CharField(max_length=180, blank=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.CheckConstraint(
+                check=~models.Q(user=models.F("actor")),
+                name="notification_user_not_actor",
+            ),
+            models.UniqueConstraint(
+                fields=["user", "type", "dedupe_key"],
+                condition=~models.Q(dedupe_key=""),
+                name="notification_unique_dedupe_per_type",
+            ),
+        ]
+
+
+class PushDevice(models.Model):
+    PLATFORM_IOS = "ios"
+    PLATFORM_ANDROID = "android"
+    PLATFORM_CHOICES = [
+        (PLATFORM_IOS, "iOS"),
+        (PLATFORM_ANDROID, "Android"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="push_devices",
+    )
+    expo_push_token = models.CharField(max_length=200, unique=True)
+    platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES)
+    enabled = models.BooleanField(default=True)
+    last_seen_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-last_seen_at", "-id"]

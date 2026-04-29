@@ -13,9 +13,12 @@ from moments.views import (
     FriendshipRequestCreateView,
     MomentPhotoViewSet,
     MomentViewSet,
+    NotificationListView,
+    NotificationReadAllView,
     PersonViewSet,
     ProfileMeView,
     ProfilePersonView,
+    PushDeviceRegisterView,
     ReactionViewSet,
 )
 
@@ -36,6 +39,9 @@ urlpatterns = [
     path("api/profile/me/", ProfileMeView.as_view()),
     path("api/profile/people/<int:person_id>/", ProfilePersonView.as_view()),
     path("api/friends/", FriendshipListView.as_view()),
+    path("api/notifications/", NotificationListView.as_view()),
+    path("api/notifications/read-all/", NotificationReadAllView.as_view()),
+    path("api/push/register/", PushDeviceRegisterView.as_view()),
     path("api/friends/requests/", FriendshipRequestCreateView.as_view()),
     path("api/friends/requests/<int:friendship_id>/accept/", FriendshipAcceptView.as_view()),
     path("api/friends/<int:user_id>/", FriendshipDeleteView.as_view()),

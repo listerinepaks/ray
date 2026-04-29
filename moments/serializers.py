@@ -6,7 +6,18 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from .access import get_moment_access_level, sync_moment_access
-from .models import Comment, Friendship, Moment, MomentAccess, MomentPerson, MomentPhoto, Person, Reaction
+from .models import (
+    Comment,
+    Friendship,
+    Moment,
+    MomentAccess,
+    MomentPerson,
+    MomentPhoto,
+    Notification,
+    Person,
+    PushDevice,
+    Reaction,
+)
 
 
 class PersonSerializer(serializers.ModelSerializer):
@@ -445,3 +456,34 @@ class ReactionSerializer(serializers.ModelSerializer):
         model = Reaction
         fields = ["id", "moment", "user", "user_username", "type", "created_at"]
         read_only_fields = ["id", "moment", "user", "created_at"]
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    actor_username = serializers.CharField(source="actor.username", read_only=True)
+    actor_avatar = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Notification
+        fields = [
+            "id",
+            "type",
+            "user",
+            "actor",
+            "actor_username",
+            "actor_avatar",
+            "moment",
+            "comment",
+            "friendship",
+            "read_at",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_actor_avatar(self, obj):
+        mapping = self.context.get("avatar_by_user_id") or {}
+        return mapping.get(obj.actor_id)
+
+
+class PushDeviceRegisterSerializer(serializers.Serializer):
+    expo_push_token = serializers.CharField(max_length=200)
+    platform = serializers.ChoiceField(choices=PushDevice.PLATFORM_CHOICES)

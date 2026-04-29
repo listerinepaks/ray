@@ -1,13 +1,16 @@
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
 
 import {
   fetchMe,
   postTokenLogin,
   postTokenRevoke,
+  registerPushDevice,
   setApiToken,
   type Me,
 } from '@/lib/api';
+import { registerForPushToken } from '@/lib/push';
 
 const TOKEN_KEY = 'ray_api_token';
 
@@ -23,6 +26,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<Me | null>(null);
   const [booting, setBooting] = useState(true);
+  const [registeredPushToken, setRegisteredPushToken] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,6 +46,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setRegisteredPushToken(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const token = await registerForPushToken();
+      if (!token || cancelled || token === registeredPushToken) return;
+      try {
+        await registerPushDevice({
+          expo_push_token: token,
+          platform: Platform.OS === 'ios' ? 'ios' : 'android',
+        });
+        if (!cancelled) setRegisteredPushToken(token);
+      } catch {
+        // Ignore registration issues; app works without push.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [registeredPushToken, user]);
 
   const login = useCallback(async (username: string, password: string) => {
     const res = await postTokenLogin(username, password);

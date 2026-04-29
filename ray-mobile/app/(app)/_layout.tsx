@@ -47,6 +47,7 @@ export default function AppGroupLayout() {
         <Stack.Screen name="profile" options={{ title: 'Profile' }} />
         <Stack.Screen name="profile-edit" options={{ title: 'Edit profile' }} />
         <Stack.Screen name="friends" options={{ title: 'Friends' }} />
+        <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
         <Stack.Screen name="profile/[id]" options={{ title: 'Profile' }} />
         <Stack.Screen
           name="moment/new"

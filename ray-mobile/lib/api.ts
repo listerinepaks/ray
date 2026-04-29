@@ -369,6 +369,27 @@ export type FriendshipList = {
   pending_outgoing: Friendship[];
 };
 
+export type NotificationItem = {
+  id: number;
+  type:
+    | 'friend_posted'
+    | 'friend_request_received'
+    | 'friend_request_accepted'
+    | 'moment_commented'
+    | 'moment_reacted'
+    | 'mentioned'
+    | string;
+  user: number;
+  actor: number;
+  actor_username?: string;
+  actor_avatar?: string | null;
+  moment: number | null;
+  comment: number | null;
+  friendship: number | null;
+  read_at: string | null;
+  created_at: string;
+};
+
 export async function fetchSharingUsers(): Promise<SharingUser[]> {
   const base = getApiBase();
   const res = await fetch(`${base}/api/auth/users/`, {
@@ -386,6 +407,37 @@ export async function fetchFriendships(): Promise<FriendshipList> {
   });
   if (!res.ok) throw new Error(await parseErrorBody(res));
   return res.json() as Promise<FriendshipList>;
+}
+
+export async function fetchNotifications(): Promise<{ results: NotificationItem[]; unread_count: number }> {
+  const base = getApiBase();
+  const res = await fetch(`${base}/api/notifications/`, {
+    headers: baseHeaders(),
+  });
+  if (!res.ok) throw new Error(await parseErrorBody(res));
+  return res.json() as Promise<{ results: NotificationItem[]; unread_count: number }>;
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  const base = getApiBase();
+  const res = await fetch(`${base}/api/notifications/read-all/`, {
+    method: 'POST',
+    headers: baseHeaders(),
+  });
+  if (!res.ok) throw new Error(await parseErrorBody(res));
+}
+
+export async function registerPushDevice(payload: {
+  expo_push_token: string;
+  platform: 'ios' | 'android';
+}): Promise<void> {
+  const base = getApiBase();
+  const res = await fetch(`${base}/api/push/register/`, {
+    method: 'POST',
+    headers: baseHeaders(true),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await parseErrorBody(res));
 }
 
 export async function sendFriendRequest(userId: number): Promise<Friendship> {

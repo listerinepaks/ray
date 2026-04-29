@@ -31,6 +31,7 @@ import {
   acceptFriendRequest,
   fetchFriendships,
   fetchMoments,
+  fetchNotifications,
   fetchProfile,
   mediaUrl,
   type Friendship,
@@ -62,15 +63,21 @@ export default function TimelineScreen() {
   const [pendingIncoming, setPendingIncoming] = useState<Friendship[]>([]);
   const [friendRequestBusyId, setFriendRequestBusyId] = useState<number | null>(null);
   const [friendRequestError, setFriendRequestError] = useState<string | null>(null);
+  const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const lastLoadedAtRef = useRef<number>(0);
 
   const load = useCallback(async () => {
     setError(null);
     setFriendRequestError(null);
     try {
-      const [list, friendships] = await Promise.all([fetchMoments(), fetchFriendships()]);
+      const [list, friendships, notifications] = await Promise.all([
+        fetchMoments(),
+        fetchFriendships(),
+        fetchNotifications(),
+      ]);
       setMoments(list);
       setPendingIncoming(friendships.pending_incoming ?? []);
+      setNotificationUnreadCount(notifications.unread_count ?? 0);
       const accepted = new Set<number>();
       for (const row of friendships.accepted) {
         accepted.add(row.requester_id === user?.id ? row.addressee_id : row.requester_id);
@@ -194,6 +201,23 @@ export default function TimelineScreen() {
             <Text style={styles.headerNew}>New moment</Text>
           </Pressable>
           <Pressable
+            onPress={() => router.push('/notifications')}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+            style={styles.headerBellButton}>
+            <View style={styles.headerBellInner}>
+              <Ionicons name="notifications-outline" size={20} color={theme.textPrimary} />
+              {notificationUnreadCount > 0 ? (
+                <View style={styles.headerBellBadge}>
+                  <Text style={styles.headerBellBadgeText}>
+                    {notificationUnreadCount > 9 ? '9+' : String(notificationUnreadCount)}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </Pressable>
+          <Pressable
             onPress={() => router.push('/profile')}
             hitSlop={12}
             accessibilityRole="button"
@@ -212,7 +236,7 @@ export default function TimelineScreen() {
         </View>
       ),
     });
-  }, [navigation, profile?.avatar, profile?.display_name, router, user?.username]);
+  }, [navigation, notificationUnreadCount, profile?.avatar, profile?.display_name, router, user?.username]);
 
   const visibleMoments = useMemo(() => {
     if (feedTab === 'looking_ahead') {
@@ -662,6 +686,30 @@ const styles = StyleSheet.create({
     backgroundColor: theme.bgSecondary,
     borderWidth: 1,
     borderColor: theme.cardBorder,
+  },
+  headerBellButton: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerBellInner: { position: 'relative' },
+  headerBellBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -10,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 8.5,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.accentDusk,
+  },
+  headerBellBadgeText: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 10,
+    color: '#fff',
   },
   headerAvatarImage: {
     width: '100%',
