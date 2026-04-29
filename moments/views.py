@@ -477,4 +477,9 @@ class PushDeviceRegisterView(APIView):
                 "enabled": True,
             },
         )
+        token_hint = f"{token[:28]}…" if len(token) > 28 else token
+        print(
+            f"[RayPush] Push device registered: user_id={request.user.id} platform={platform} token_prefix={token_hint}",
+            flush=True,
+        )
         return Response(status=status.HTTP_204_NO_CONTENT)

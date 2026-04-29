@@ -55,15 +55,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     (async () => {
       const token = await registerForPushToken();
-      if (!token || cancelled || token === registeredPushToken) return;
+      if (!token || cancelled || token === registeredPushToken) {
+        if (!token && !cancelled) {
+          console.info('[RayPush] No Expo push token; skipping backend registration.');
+        }
+        return;
+      }
       try {
         await registerPushDevice({
           expo_push_token: token,
           platform: Platform.OS === 'ios' ? 'ios' : 'android',
         });
         if (!cancelled) setRegisteredPushToken(token);
-      } catch {
-        // Ignore registration issues; app works without push.
+        console.info('[RayPush] Push device registered with backend successfully.');
+      } catch (err) {
+        console.warn('[RayPush] Backend push registration failed:', err);
       }
     })();
     return () => {
