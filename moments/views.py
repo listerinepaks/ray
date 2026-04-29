@@ -1,5 +1,3 @@
-import sys
-
 from django.db import IntegrityError
 from django.db.models import Count, OuterRef, Q, Subquery
 from django.http import Http404
@@ -28,6 +26,7 @@ from .notifications import (
     notify_moment_commented,
     notify_moment_reacted,
 )
+from .push import ray_push_log
 from .permissions import (
     CommentPermission,
     MomentEditPermission,
@@ -480,9 +479,7 @@ class PushDeviceRegisterView(APIView):
             },
         )
         token_hint = f"{token[:28]}…" if len(token) > 28 else token
-        print(
-            f"[RayPush] Push device registered: user_id={request.user.id} platform={platform} token_prefix={token_hint}",
-            file=sys.stderr,
-            flush=True,
+        ray_push_log(
+            f"[RayPush] Push device registered: user_id={request.user.id} platform={platform} token_prefix={token_hint}"
         )
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import sys
 from urllib.error import HTTPError, URLError
@@ -10,9 +11,10 @@ EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 _LOG_PREFIX = "[RayPush]"
 
 
-def _ray_push_log(msg: str) -> None:
-    """Supervisor often tails gunicorn.err.log only; stderr matches that file."""
+def ray_push_log(msg: str) -> None:
+    """Emit to stderr and to gunicorn's error logger (Supervisor stderr_logfile)."""
     print(msg, file=sys.stderr, flush=True)
+    logging.getLogger("gunicorn.error").warning("%s", msg)
 
 
 def send_push_to_user(user_id: int, *, title: str, body: str, url: str | None = None) -> None:
@@ -22,7 +24,7 @@ def send_push_to_user(user_id: int, *, title: str, body: str, url: str | None = 
     )
     access_token = os.environ.get("EXPO_ACCESS_TOKEN", "").strip()
     if not tokens:
-        _ray_push_log(
+        ray_push_log(
             f"{_LOG_PREFIX} No enabled push devices for user_id={user_id}; "
             f"EXPO_ACCESS_TOKEN is {'set' if access_token else 'not set'} (nothing sent)."
         )
@@ -32,7 +34,7 @@ def send_push_to_user(user_id: int, *, title: str, body: str, url: str | None = 
     }
     if access_token:
         headers["Authorization"] = f"Bearer {access_token}"
-    _ray_push_log(
+    ray_push_log(
         f"{_LOG_PREFIX} EXPO_ACCESS_TOKEN is {'set' if access_token else 'not set'}; "
         f"sending {len(tokens)} message(s) for user_id={user_id}"
     )
@@ -58,17 +60,17 @@ def send_push_to_user(user_id: int, *, title: str, body: str, url: str | None = 
         with urlopen(req, timeout=8) as response:
             raw = response.read().decode("utf-8")
     except (HTTPError, URLError, TimeoutError) as exc:
-        _ray_push_log(f"{_LOG_PREFIX} Expo Push API request failed for user_id={user_id}: {exc}")
+        ray_push_log(f"{_LOG_PREFIX} Expo Push API request failed for user_id={user_id}: {exc}")
         return
 
     try:
         result = json.loads(raw)
     except Exception as exc:
-        _ray_push_log(f"{_LOG_PREFIX} Expo Push API invalid JSON for user_id={user_id}: {exc}")
+        ray_push_log(f"{_LOG_PREFIX} Expo Push API invalid JSON for user_id={user_id}: {exc}")
         return
     data = result.get("data") if isinstance(result, dict) else None
     if not isinstance(data, list):
-        _ray_push_log(
+        ray_push_log(
             f"{_LOG_PREFIX} Expo Push API unexpected response for user_id={user_id} "
             f"(expected data list, got {type(result).__name__})"
         )
@@ -78,7 +80,7 @@ def send_push_to_user(user_id: int, *, title: str, body: str, url: str | None = 
     for item, token in zip(data, tokens, strict=False):
         if not isinstance(item, dict):
             err += 1
-            _ray_push_log(f"{_LOG_PREFIX} Non-dict ticket for user_id={user_id}: {item!r}")
+            ray_push_log(f"{_LOG_PREFIX} Non-dict ticket for user_id={user_id}: {item!r}")
             continue
         status = item.get("status")
         details = item.get("details")
@@ -89,8 +91,8 @@ def send_push_to_user(user_id: int, *, title: str, body: str, url: str | None = 
             ok += 1
         else:
             err += 1
-            _ray_push_log(
+            ray_push_log(
                 f"{_LOG_PREFIX} Ticket error user_id={user_id} status={status} "
                 f"message={item.get('message')} details={details}"
             )
-    _ray_push_log(f"{_LOG_PREFIX} Expo Push API completed for user_id={user_id} ok={ok} error_tickets={err}")
+    ray_push_log(f"{_LOG_PREFIX} Expo Push API completed for user_id={user_id} ok={ok} error_tickets={err}")
