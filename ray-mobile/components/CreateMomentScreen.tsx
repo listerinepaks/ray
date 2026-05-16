@@ -39,6 +39,7 @@ import {
   type PhotoUpload,
   type SharingUser,
 } from '@/lib/api';
+import { compatibleImagePickerOptions, photoUploadFromAsset } from '@/lib/photoUpload';
 
 const VIS = {
   private: 'private',
@@ -305,10 +306,14 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
       if (!assets.length) return;
       const next: PhotoDraft[] = [];
       for (const a of assets) {
-        const uri = a.uri;
-        const name = a.fileName ?? `photo-${next.length}.jpg`;
-        const type = a.mimeType ?? 'image/jpeg';
-        next.push({ key: newKey(), uri, caption: '', name, type });
+        const upload = photoUploadFromAsset(a, `photo-${next.length}.jpg`);
+        next.push({
+          key: newKey(),
+          uri: upload.uri,
+          caption: '',
+          name: upload.name,
+          type: upload.type,
+        });
       }
       setPhotos((prev) => [...prev, ...next]);
 
@@ -330,6 +335,7 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
+      ...compatibleImagePickerOptions,
       exif: true,
       quality: 0.88,
       cameraType: ImagePicker.CameraType.back,
@@ -347,6 +353,7 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsMultipleSelection: true,
+      ...compatibleImagePickerOptions,
       exif: true,
       quality: 0.88,
     });

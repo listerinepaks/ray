@@ -27,6 +27,7 @@ import {
   type PhotoUpload,
   type Profile,
 } from '@/lib/api';
+import { compatibleImagePickerOptions, photoUploadFromAsset } from '@/lib/photoUpload';
 
 export default function EditProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -82,16 +83,13 @@ export default function EditProfileScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsMultipleSelection: false,
+      ...compatibleImagePickerOptions,
       quality: 0.88,
     });
     if (result.canceled) return;
     const asset = result.assets[0];
     if (!asset) return;
-    setAvatarDraft({
-      uri: asset.uri,
-      name: asset.fileName ?? 'profile-photo.jpg',
-      type: asset.mimeType ?? 'image/jpeg',
-    });
+    setAvatarDraft(photoUploadFromAsset(asset, 'profile-photo.jpg'));
     setError(null);
     setSaveMessage(null);
   }
