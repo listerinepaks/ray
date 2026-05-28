@@ -368,7 +368,7 @@ class FriendshipListView(APIView):
             for p in Person.objects.filter(linked_user_id__in=user_ids).only("id", "linked_user_id", "profile_photo")
         }
         avatar_by_user_id = {
-            uid: person.profile_photo.name
+            uid: person.profile_photo.url
             for uid, person in people_by_user_id.items()
             if person.profile_photo
         }
@@ -483,7 +483,7 @@ class NotificationListView(APIView):
         )
         user_ids = {row.actor_id for row in rows}
         avatar_by_user_id = {
-            p.linked_user_id: p.profile_photo.name
+            p.linked_user_id: p.profile_photo.url
             for p in Person.objects.filter(linked_user_id__in=user_ids).only("linked_user_id", "profile_photo")
             if p.profile_photo
         }
