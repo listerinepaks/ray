@@ -1,9 +1,9 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
+import { Image } from 'expo-image';
 import {
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -27,7 +27,7 @@ import {
   type PhotoUpload,
   type Profile,
 } from '@/lib/api';
-import { compatibleImagePickerOptions, photoUploadFromAsset } from '@/lib/photoUpload';
+import { compatibleImagePickerOptions, resizeForAvatar } from '@/lib/photoUpload';
 
 export default function EditProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -89,7 +89,8 @@ export default function EditProfileScreen() {
     if (result.canceled) return;
     const asset = result.assets[0];
     if (!asset) return;
-    setAvatarDraft(photoUploadFromAsset(asset, 'profile-photo.jpg'));
+    const draft = await resizeForAvatar(asset);
+    setAvatarDraft(draft);
     setError(null);
     setSaveMessage(null);
   }

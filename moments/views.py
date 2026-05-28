@@ -1,8 +1,12 @@
+from io import BytesIO
+
+from django.core.files.base import ContentFile
 from django.db import IntegrityError
 from django.db.models import Count, OuterRef, Q, Subquery
 from django.http import Http404
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from PIL import Image as PILImage, ImageOps
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -47,6 +51,22 @@ from .serializers import (
     PushDeviceRegisterSerializer,
     ReactionSerializer,
 )
+
+_THUMB_MAX_PX = 600
+
+
+def _make_thumbnail(file_obj) -> bytes | None:
+    try:
+        file_obj.seek(0)
+        with PILImage.open(file_obj) as img:
+            img = ImageOps.exif_transpose(img)
+            img = img.convert("RGB")
+            img.thumbnail((_THUMB_MAX_PX, _THUMB_MAX_PX), PILImage.LANCZOS)
+            buf = BytesIO()
+            img.save(buf, format="JPEG", quality=85, optimize=True)
+            return buf.getvalue()
+    except Exception:
+        return None
 
 
 class PersonViewSet(ModelViewSet):
@@ -259,7 +279,22 @@ class MomentPhotoViewSet(ModelViewSet):
         moment = get_moment_for_nested_view(self)
         if moment is None:
             raise Http404
-        serializer.save(moment=moment)
+
+        # Read the upload into memory for thumbnail generation before DRF consumes it.
+        image_file = self.request.FILES.get("image")
+        thumb_content = _make_thumbnail(image_file) if image_file else None
+        if image_file:
+            image_file.seek(0)
+
+        instance = serializer.save(moment=moment)
+
+        if thumb_content:
+            stem = instance.image.name.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+            instance.thumbnail.save(
+                f"moments/thumbnails/{stem}.jpg",
+                ContentFile(thumb_content),
+                save=True,
+            )
 
 
 class CommentViewSet(ModelViewSet):

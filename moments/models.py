@@ -128,6 +128,7 @@ class MomentPhoto(models.Model):
         related_name="photos",
     )
     image = models.ImageField(upload_to="moments/")
+    thumbnail = models.ImageField(upload_to="moments/thumbnails/", blank=True)
     caption = models.CharField(max_length=240, blank=True)
     sort_order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)

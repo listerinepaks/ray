@@ -155,6 +155,7 @@ export async function fetchProfileByPerson(personId: number): Promise<Profile> {
 export type MomentPhoto = {
   id: number;
   image: string;
+  thumbnail: string | null;
   caption: string;
   sort_order: number;
   created_at: string;

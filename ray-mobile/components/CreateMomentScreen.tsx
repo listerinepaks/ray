@@ -3,10 +3,10 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Image } from 'expo-image';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -39,7 +39,7 @@ import {
   type PhotoUpload,
   type SharingUser,
 } from '@/lib/api';
-import { compatibleImagePickerOptions, photoUploadFromAsset } from '@/lib/photoUpload';
+import { compatibleImagePickerOptions, photoUploadFromAsset, resizeForMomentPhoto } from '@/lib/photoUpload';
 
 const VIS = {
   private: 'private',
@@ -304,18 +304,13 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
   const applyPickedAssets = useCallback(
     (assets: ImagePicker.ImagePickerAsset[]) => {
       if (!assets.length) return;
-      const next: PhotoDraft[] = [];
-      for (const a of assets) {
-        const upload = photoUploadFromAsset(a, `photo-${next.length}.jpg`);
-        next.push({
-          key: newKey(),
-          uri: upload.uri,
-          caption: '',
-          name: upload.name,
-          type: upload.type,
-        });
-      }
-      setPhotos((prev) => [...prev, ...next]);
+
+      // Add immediately with original URIs for instant preview feedback.
+      const drafts: PhotoDraft[] = assets.map((a, i) => {
+        const upload = photoUploadFromAsset(a, `photo-${i}.jpg`);
+        return { key: newKey(), uri: upload.uri, caption: '', name: upload.name, type: upload.type };
+      });
+      setPhotos((prev) => [...prev, ...drafts]);
 
       // Preload from first photo metadata if user hasn't already set these.
       const firstWithMetadata = assets.map(getCapturedAtFromAsset).find(Boolean) ?? null;
@@ -323,6 +318,20 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
         if (!dateEdited) setDate(formatDateInputFromDate(firstWithMetadata));
         if (!observedAtEdited) setObservedAt(toDatetimeLocal(firstWithMetadata.toISOString()));
       }
+
+      // Resize in background; update drafts with compressed versions before upload.
+      void Promise.all(assets.map((a, i) => resizeForMomentPhoto(a, `photo-${i}.jpg`))).then(
+        (resized) => {
+          setPhotos((prev) =>
+            prev.map((p) => {
+              const idx = drafts.findIndex((d) => d.key === p.key);
+              if (idx === -1) return p;
+              const r = resized[idx];
+              return r ? { ...p, uri: r.uri, name: r.name, type: r.type } : p;
+            }),
+          );
+        },
+      );
     },
     [dateEdited, observedAtEdited],
   );

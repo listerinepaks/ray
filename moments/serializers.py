@@ -126,8 +126,8 @@ class PersonProfileSerializer(serializers.ModelSerializer):
 class MomentPhotoSerializer(serializers.ModelSerializer):
     class Meta:
         model = MomentPhoto
-        fields = ["id", "image", "caption", "sort_order", "created_at"]
-        read_only_fields = ["id", "created_at"]
+        fields = ["id", "image", "thumbnail", "caption", "sort_order", "created_at"]
+        read_only_fields = ["id", "thumbnail", "created_at"]
 
 
 class MomentPersonWriteSerializer(serializers.Serializer):

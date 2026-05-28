@@ -258,6 +258,7 @@ export async function removeFriend(userId: number): Promise<void> {
 export type MomentPhoto = {
   id: number
   image: string
+  thumbnail: string | null
   caption: string
   sort_order: number
   created_at: string

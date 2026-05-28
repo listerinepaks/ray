@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { fonts, theme } from '@/constants/theme';
@@ -166,7 +167,7 @@ export default function PersonProfileScreen() {
             {authorMoments.map((m) => {
               const sorted = [...(m.photos ?? [])].sort((a, b) => a.sort_order - b.sort_order);
               const first = sorted[0];
-              const thumb = first ? mediaUrl(first.image) : '';
+              const thumb = first ? mediaUrl(first.thumbnail ?? first.image) : '';
               return (
                 <Pressable
                   key={m.id}

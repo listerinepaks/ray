@@ -1,6 +1,9 @@
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 
 const HEIC_MIME_TYPES = new Set(['image/heic', 'image/heif']);
+const AVATAR_MAX_PX = 600;
+const MOMENT_MAX_PX = 1600;
 const EXTENSION_BY_MIME: Record<string, string> = {
   'image/jpeg': '.jpg',
   'image/png': '.png',
@@ -64,4 +67,46 @@ export function photoUploadFromAsset(
     name,
     type,
   };
+}
+
+export async function resizeForAvatar(
+  asset: ImagePicker.ImagePickerAsset,
+): Promise<{ uri: string; name: string; type: string }> {
+  const w = asset.width ?? 0;
+  const h = asset.height ?? 0;
+
+  const ctx = ImageManipulator.manipulate(asset.uri);
+  if (w > AVATAR_MAX_PX || h > AVATAR_MAX_PX) {
+    if (w >= h) {
+      ctx.resize({ width: AVATAR_MAX_PX });
+    } else {
+      ctx.resize({ height: AVATAR_MAX_PX });
+    }
+  }
+  const image = await ctx.renderAsync();
+  const result = await image.saveAsync({ compress: 0.85, format: SaveFormat.JPEG });
+
+  return { uri: result.uri, name: 'profile-photo.jpg', type: 'image/jpeg' };
+}
+
+export async function resizeForMomentPhoto(
+  asset: ImagePicker.ImagePickerAsset,
+  fallbackName: string,
+): Promise<{ uri: string; name: string; type: string }> {
+  const w = asset.width ?? 0;
+  const h = asset.height ?? 0;
+
+  const ctx = ImageManipulator.manipulate(asset.uri);
+  if (w > MOMENT_MAX_PX || h > MOMENT_MAX_PX) {
+    if (w >= h) {
+      ctx.resize({ width: MOMENT_MAX_PX });
+    } else {
+      ctx.resize({ height: MOMENT_MAX_PX });
+    }
+  }
+  const image = await ctx.renderAsync();
+  const result = await image.saveAsync({ compress: 0.85, format: SaveFormat.JPEG });
+
+  const name = fallbackName.replace(/\.[a-z0-9]+$/i, '.jpg');
+  return { uri: result.uri, name, type: 'image/jpeg' };
 }

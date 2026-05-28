@@ -3,9 +3,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { useRouter, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Image } from 'expo-image';
 import {
   ActivityIndicator,
-  Image,
   Platform,
   Pressable,
   RefreshControl,
@@ -502,7 +502,7 @@ export default function TimelineScreen() {
               </View>
               {thumb ? (
                 <View style={styles.thumbWrap}>
-                  <AspectFitImage uri={mediaUrl(thumb.image)} />
+                  <AspectFitImage uri={mediaUrl(thumb.thumbnail ?? thumb.image)} />
                   {photos.length > 1 ? (
                     <View style={styles.photoBadge}>
                       <Text style={styles.photoBadgeText}>{photos.length} photos</Text>

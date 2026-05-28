@@ -157,7 +157,7 @@ export function PersonProfile() {
                   to={`/moments/${m.id}`}
                   aria-label={`Open moment ${m.id}`}>
                   {thumb ? (
-                    <img src={mediaUrl(thumb.image)} alt="" loading="lazy" />
+                    <img src={mediaUrl(thumb.thumbnail ?? thumb.image)} alt="" loading="lazy" />
                   ) : (
                     <span className="profile-moment-tile-fallback">No photo</span>
                   )}

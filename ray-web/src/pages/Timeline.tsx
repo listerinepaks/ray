@@ -168,7 +168,7 @@ export function Timeline({
                 {thumb ? (
                   <div className="moment-card-thumb">
                     <AspectFitImage
-                      src={mediaUrl(thumb.image)}
+                      src={mediaUrl(thumb.thumbnail ?? thumb.image)}
                       alt=""
                       loading="lazy"
                       className="moment-card-aspect-fit"

@@ -1,9 +1,9 @@
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Image } from 'expo-image';
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -142,7 +142,7 @@ export default function ProfileScreen() {
                   {authoredMoments.map((m) => {
                     const sorted = [...(m.photos ?? [])].sort((a, b) => a.sort_order - b.sort_order);
                     const first = sorted[0];
-                    const thumb = first ? mediaUrl(first.image) : '';
+                    const thumb = first ? mediaUrl(first.thumbnail ?? first.image) : '';
                     return (
                       <Pressable
                         key={m.id}
