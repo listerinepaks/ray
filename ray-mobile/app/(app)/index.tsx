@@ -4,6 +4,13 @@ import * as Location from 'expo-location';
 import { useRouter, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import Reanimated, {
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  Extrapolation,
+} from 'react-native-reanimated';
 import {
   ActivityIndicator,
   Platform,
@@ -12,6 +19,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -65,6 +73,25 @@ export default function TimelineScreen() {
   const [friendRequestError, setFriendRequestError] = useState<string | null>(null);
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const lastLoadedAtRef = useRef<number>(0);
+  const { width: screenWidth } = useWindowDimensions();
+  const scrollProgress = useSharedValue(0);
+
+  // Pivot: 80px right and 80px above the screen's top-right corner.
+  // Rotate the gradient canvas around it as the user scrolls.
+  const gradientStyle = useAnimatedStyle(() => {
+    const deg = interpolate(scrollProgress.value, [0, 4000], [0, 18], Extrapolation.CLAMP);
+    const px = screenWidth / 2 + 80;
+    const py = -80;
+    return {
+      transform: [
+        { translateX: px },
+        { translateY: py },
+        { rotate: `${deg}deg` },
+        { translateX: -px },
+        { translateY: -py },
+      ],
+    };
+  });
 
   const load = useCallback(async () => {
     setError(null);
@@ -274,6 +301,18 @@ export default function TimelineScreen() {
 
   return (
     <View style={styles.screen}>
+      <Reanimated.View
+        pointerEvents="none"
+        style={[styles.gradientCanvas, gradientStyle]}
+      >
+        <LinearGradient
+          colors={['#faf7f2', '#fef1c8', '#faf7f2', '#fde8b0', '#faf7f2', '#fef3cc', '#faf7f2']}
+          locations={[0, 0.18, 0.36, 0.54, 0.72, 0.88, 1]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={{ flex: 1 }}
+        />
+      </Reanimated.View>
       <ScrollView
         style={styles.root}
         contentInsetAdjustmentBehavior="automatic"
@@ -281,6 +320,8 @@ export default function TimelineScreen() {
           styles.content,
           { paddingBottom: Math.max(insets.bottom + 100, 120) },
         ]}
+        onScroll={(e) => { scrollProgress.value = e.nativeEvent.contentOffset.y; }}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -652,7 +693,14 @@ const timelineCardShadow = Platform.select({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.bgPrimary },
-  root: { flex: 1, backgroundColor: theme.bgPrimary },
+  root: { flex: 1, backgroundColor: 'transparent' },
+  gradientCanvas: {
+    position: 'absolute',
+    top: -600,
+    left: -600,
+    right: -600,
+    bottom: -600,
+  },
   content: {
     maxWidth: 640,
     width: '100%',
