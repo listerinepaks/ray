@@ -99,6 +99,23 @@ export async function postTokenLogin(username: string, password: string): Promis
   return res.json() as Promise<{ token: string } & Me>;
 }
 
+export async function postTokenRegister(payload: {
+  username: string;
+  password: string;
+  display_name?: string;
+  email?: string;
+  invite_code?: string;
+}): Promise<{ token: string } & Me> {
+  const base = getApiBase();
+  const res = await fetch(`${base}/api/auth/token/register/`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await parseErrorBody(res));
+  return res.json() as Promise<{ token: string } & Me>;
+}
+
 export async function postTokenRevoke(): Promise<void> {
   const base = getApiBase();
   const res = await fetch(`${base}/api/auth/token/revoke/`, {

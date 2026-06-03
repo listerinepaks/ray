@@ -9,6 +9,7 @@ import {
   mediaUrl,
   postLogin,
   postLogout,
+  postRegister,
   type Friendship,
   type Me,
   type Moment,
@@ -25,6 +26,7 @@ import { Timeline } from './pages/Timeline'
 import './App.css'
 
 type FeedTab = 'all' | 'looking_ahead' | 'friends' | 'mentions'
+type AuthMode = 'login' | 'register'
 
 function parseFeedTabParam(value: string | null): FeedTab | null {
   if (value === 'all' || value === 'looking_ahead' || value === 'friends' || value === 'mentions') {
@@ -44,9 +46,14 @@ function App() {
   const [feedTab, setFeedTab] = useState<FeedTab>('all')
   const [friendUserIds, setFriendUserIds] = useState<Set<number>>(() => new Set())
   const [pendingIncoming, setPendingIncoming] = useState<Friendship[]>([])
+  const [authMode, setAuthMode] = useState<AuthMode>('login')
   const [loginError, setLoginError] = useState<string | null>(null)
+  const [displayName, setDisplayName] = useState('')
+  const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
   const [loginBusy, setLoginBusy] = useState(false)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const accountMenuRef = useRef<HTMLDivElement | null>(null)
@@ -206,9 +213,10 @@ function App() {
     setLoginError(null)
     setLoginBusy(true)
     try {
-      const me = await postLogin(username, password)
+      const me = await postLogin(username.trim(), password)
       setUser(me)
       setPassword('')
+      setConfirmPassword('')
       setError(null)
       navigate(location.pathname, { replace: true })
     } catch (err) {
@@ -216,6 +224,44 @@ function App() {
     } finally {
       setLoginBusy(false)
     }
+  }
+
+  async function onRegister(e: FormEvent) {
+    e.preventDefault()
+    setLoginError(null)
+    if (password !== confirmPassword) {
+      setLoginError('Passwords do not match.')
+      return
+    }
+    setLoginBusy(true)
+    try {
+      const me = await postRegister({
+        username: username.trim(),
+        password,
+        display_name: displayName.trim(),
+        email: email.trim() || undefined,
+        invite_code: inviteCode.trim() || undefined,
+      })
+      setUser(me)
+      setDisplayName('')
+      setEmail('')
+      setPassword('')
+      setConfirmPassword('')
+      setInviteCode('')
+      setError(null)
+      navigate(location.pathname, { replace: true })
+    } catch (err) {
+      setLoginError(err instanceof Error ? err.message : 'Account creation failed.')
+    } finally {
+      setLoginBusy(false)
+    }
+  }
+
+  function switchAuthMode(next: AuthMode) {
+    setAuthMode(next)
+    setLoginError(null)
+    setPassword('')
+    setConfirmPassword('')
   }
 
   async function onLogout() {
@@ -256,7 +302,44 @@ function App() {
           <RayLogo className="ray-logo--login" />
         </header>
 
-        <form className="login-form" onSubmit={onLogin}>
+        <form
+          className="login-form"
+          onSubmit={authMode === 'login' ? onLogin : onRegister}
+        >
+          <div className="auth-switch" aria-label="Authentication mode">
+            <button
+              type="button"
+              className={`auth-switch-btn${authMode === 'login' ? ' auth-switch-btn--on' : ''}`}
+              aria-pressed={authMode === 'login'}
+              onClick={() => switchAuthMode('login')}
+            >
+              Sign in
+            </button>
+            <button
+              type="button"
+              className={`auth-switch-btn${authMode === 'register' ? ' auth-switch-btn--on' : ''}`}
+              aria-pressed={authMode === 'register'}
+              onClick={() => switchAuthMode('register')}
+            >
+              Create account
+            </button>
+          </div>
+
+          {authMode === 'register' ? (
+            <label className="field">
+              <span>Display name</span>
+              <input
+                type="text"
+                name="display_name"
+                autoComplete="name"
+                value={displayName}
+                maxLength={120}
+                onChange={(e) => setDisplayName(e.target.value)}
+                required
+              />
+            </label>
+          ) : null}
+
           <label className="field">
             <span>Username</span>
             <input
@@ -268,24 +351,67 @@ function App() {
               required
             />
           </label>
+          {authMode === 'register' ? (
+            <label className="field">
+              <span>Email</span>
+              <input
+                type="email"
+                name="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </label>
+          ) : null}
           <label className="field">
             <span>Password</span>
             <input
               type="password"
               name="password"
-              autoComplete="current-password"
+              autoComplete={authMode === 'register' ? 'new-password' : 'current-password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
           </label>
+          {authMode === 'register' ? (
+            <>
+              <label className="field">
+                <span>Confirm password</span>
+                <input
+                  type="password"
+                  name="confirm_password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+              </label>
+              <label className="field">
+                <span>Invite code</span>
+                <input
+                  type="text"
+                  name="invite_code"
+                  autoComplete="off"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                />
+              </label>
+            </>
+          ) : null}
           {loginError ? (
             <p className="form-error" role="alert">
               {loginError}
             </p>
           ) : null}
           <button type="submit" className="login-btn" disabled={loginBusy}>
-            {loginBusy ? 'Signing in…' : 'Sign in'}
+            {loginBusy
+              ? authMode === 'login'
+                ? 'Signing in…'
+                : 'Creating account…'
+              : authMode === 'login'
+                ? 'Sign in'
+                : 'Create account'}
           </button>
         </form>
       </div>

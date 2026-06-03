@@ -1,9 +1,118 @@
 from django.contrib.auth import get_user_model
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from .access import sync_moment_access
 from .models import Friendship, Moment, MomentPerson, Person
+from .user_profiles import ensure_linked_person_for_user
+
+
+class RegistrationTests(APITestCase):
+    def test_web_registration_creates_linked_person_and_session(self):
+        response = self.client.post(
+            "/api/auth/register/",
+            {
+                "username": "newbie",
+                "password": "pw12345",
+                "display_name": "New Person",
+                "email": "newbie@example.com",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.json()["username"], "newbie")
+
+        User = get_user_model()
+        user = User.objects.get(username="newbie")
+        person = Person.objects.get(linked_user=user)
+        self.assertEqual(person.created_by, user)
+        self.assertEqual(person.name, "New Person")
+
+        me = self.client.get("/api/auth/me/")
+        self.assertEqual(me.status_code, status.HTTP_200_OK)
+        self.assertEqual(me.data["username"], "newbie")
+
+    def test_token_registration_creates_token_and_linked_person(self):
+        response = self.client.post(
+            "/api/auth/token/register/",
+            {
+                "username": "mobile",
+                "password": "pw12345",
+                "display_name": "Mobile Person",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn("token", response.data)
+
+        User = get_user_model()
+        user = User.objects.get(username="mobile")
+        self.assertEqual(Person.objects.get(linked_user=user).name, "Mobile Person")
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {response.data['token']}")
+        me = self.client.get("/api/auth/me/")
+        self.assertEqual(me.status_code, status.HTTP_200_OK)
+        self.assertEqual(me.data["username"], "mobile")
+
+    @override_settings(RAY_REGISTRATION_INVITE_CODE="join-ray")
+    def test_registration_can_require_invite_code(self):
+        response = self.client.post(
+            "/api/auth/register/",
+            {"username": "blocked", "password": "pw12345", "invite_code": "wrong"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("invite_code", response.json())
+
+        allowed = self.client.post(
+            "/api/auth/register/",
+            {"username": "allowed", "password": "pw12345", "invite_code": "join-ray"},
+            format="json",
+        )
+        self.assertEqual(allowed.status_code, status.HTTP_201_CREATED)
+
+
+class LinkedPersonProfileTests(APITestCase):
+    def test_ensure_linked_person_creates_profile_for_user(self):
+        User = get_user_model()
+        user = User.objects.create_user(
+            username="alice",
+            password="pw12345",
+            first_name="Alice",
+            last_name="Wright",
+        )
+
+        person, created = ensure_linked_person_for_user(user)
+
+        self.assertTrue(created)
+        self.assertEqual(person.linked_user, user)
+        self.assertEqual(person.created_by, user)
+        self.assertEqual(person.name, "Alice Wright")
+
+        same_person, created_again = ensure_linked_person_for_user(user)
+        self.assertFalse(created_again)
+        self.assertEqual(same_person, person)
+
+    def test_ensure_linked_person_avoids_duplicate_names_for_same_creator(self):
+        User = get_user_model()
+        user = User.objects.create_user(
+            username="alice",
+            password="pw12345",
+            first_name="Alice",
+            last_name="Wright",
+        )
+        Person.objects.create(created_by=user, name="Alice Wright")
+
+        person, created = ensure_linked_person_for_user(user)
+
+        self.assertTrue(created)
+        self.assertEqual(person.linked_user, user)
+        self.assertEqual(person.created_by, user)
+        self.assertEqual(person.name, "alice")
 
 
 class FriendshipAndAccessTests(APITestCase):

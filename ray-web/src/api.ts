@@ -112,6 +112,30 @@ export async function postLogin(username: string, password: string): Promise<Me>
   return res.json() as Promise<Me>
 }
 
+export async function postRegister(payload: {
+  username: string
+  password: string
+  display_name?: string
+  email?: string
+  invite_code?: string
+}): Promise<Me> {
+  await ensureCsrfCookie()
+  const token = getCsrfTokenFromDocument()
+  const base = getApiBase()
+  const res = await fetch(`${base}/api/auth/register/`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(token ? { 'X-CSRFToken': token } : {}),
+    },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error(await parseErrorBody(res))
+  return res.json() as Promise<Me>
+}
+
 export async function postLogout(): Promise<void> {
   await ensureCsrfCookie()
   const token = getCsrfTokenFromDocument()

@@ -33,6 +33,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/csrf/", auth_views.auth_csrf),
     path("api/auth/login/", auth_views.auth_login),
+    path("api/auth/register/", auth_views.auth_register),
     path("api/auth/logout/", auth_views.auth_logout),
     path("api/auth/me/", auth_views.AuthMeView.as_view()),
     path("api/auth/users/", auth_views.AuthUsersView.as_view()),
@@ -46,6 +47,7 @@ urlpatterns = [
     path("api/friends/requests/<int:friendship_id>/accept/", FriendshipAcceptView.as_view()),
     path("api/friends/<int:user_id>/", FriendshipDeleteView.as_view()),
     path("api/auth/token/", auth_views.auth_token_obtain),
+    path("api/auth/token/register/", auth_views.auth_token_register),
     path("api/auth/token/revoke/", auth_views.auth_token_revoke),
     path("api/", include(router.urls)),
     path(

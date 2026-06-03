@@ -20,17 +20,27 @@ import { fonts, theme } from '@/constants/theme';
 
 /** Matches `RayLogo` default base height × scale */
 const LOGIN_LOGO_SCALE = 1.1;
+type AuthMode = 'login' | 'register';
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const router = useRouter();
-  const { user, login } = useAuth();
+  const { user, login, register } = useAuth();
+  const [authMode, setAuthMode] = useState<AuthMode>('login');
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const usernameRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
+  const confirmPasswordRef = useRef<TextInput>(null);
+  const inviteCodeRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (user) router.replace('/');
@@ -40,18 +50,45 @@ export default function LoginScreen() {
 
   async function onSubmit() {
     setError(null);
+    if (authMode === 'register' && password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
     setBusy(true);
     try {
-      await login(username.trim(), password);
+      if (authMode === 'login') {
+        await login(username.trim(), password);
+      } else {
+        await register({
+          username: username.trim(),
+          password,
+          display_name: displayName.trim(),
+          email: email.trim() || undefined,
+          invite_code: inviteCode.trim() || undefined,
+        });
+      }
       router.replace('/');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Sign in failed.');
+      setError(e instanceof Error ? e.message : authMode === 'login' ? 'Sign in failed.' : 'Account creation failed.');
     } finally {
       setBusy(false);
     }
   }
 
-  const canSubmit = !busy && Boolean(username.trim() && password);
+  function switchAuthMode(next: AuthMode) {
+    setAuthMode(next);
+    setError(null);
+    setPassword('');
+    setConfirmPassword('');
+  }
+
+  const canSubmit =
+    !busy &&
+    Boolean(
+      username.trim() &&
+        password &&
+        (authMode === 'login' || (displayName.trim() && confirmPassword)),
+    );
 
   const scrollPadTop = Math.max(insets.top, 16);
   /** Push the wordmark clearly below the status bar; scales on taller phones */
@@ -86,7 +123,45 @@ export default function LoginScreen() {
         </View>
 
         <View style={[styles.form, { marginTop: formMarginTop }]}>
+          <View style={styles.switcher} accessibilityRole="tablist">
+            <Pressable
+              onPress={() => switchAuthMode('login')}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: authMode === 'login' }}
+              style={[styles.switcherBtn, authMode === 'login' && styles.switcherBtnOn]}>
+              <Text style={[styles.switcherText, authMode === 'login' && styles.switcherTextOn]}>
+                Sign in
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => switchAuthMode('register')}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: authMode === 'register' }}
+              style={[styles.switcherBtn, authMode === 'register' && styles.switcherBtnOn]}>
+              <Text style={[styles.switcherText, authMode === 'register' && styles.switcherTextOn]}>
+                Create account
+              </Text>
+            </Pressable>
+          </View>
+
+          {authMode === 'register' ? (
+            <TextInput
+              value={displayName}
+              onChangeText={setDisplayName}
+              autoCapitalize="words"
+              autoCorrect={false}
+              textContentType="name"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => usernameRef.current?.focus()}
+              accessibilityLabel="Display name"
+              style={styles.input}
+              placeholderTextColor={theme.textMuted}
+              placeholder="Display name"
+            />
+          ) : null}
           <TextInput
+            ref={usernameRef}
             value={username}
             onChangeText={setUsername}
             autoCapitalize="none"
@@ -94,27 +169,81 @@ export default function LoginScreen() {
             textContentType="username"
             returnKeyType="next"
             blurOnSubmit={false}
-            onSubmitEditing={() => passwordRef.current?.focus()}
+            onSubmitEditing={() => {
+              if (authMode === 'register') emailRef.current?.focus();
+              else passwordRef.current?.focus();
+            }}
             accessibilityLabel="Username"
             style={styles.input}
             placeholderTextColor={theme.textMuted}
             placeholder="Username"
           />
+          {authMode === 'register' ? (
+            <TextInput
+              ref={emailRef}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              accessibilityLabel="Email"
+              style={styles.input}
+              placeholderTextColor={theme.textMuted}
+              placeholder="Email"
+            />
+          ) : null}
           <TextInput
             ref={passwordRef}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
-            textContentType="password"
-            returnKeyType="go"
+            textContentType={authMode === 'register' ? 'newPassword' : 'password'}
+            returnKeyType={authMode === 'register' ? 'next' : 'go'}
             onSubmitEditing={() => {
-              if (canSubmit) void onSubmit();
+              if (authMode === 'register') confirmPasswordRef.current?.focus();
+              else if (canSubmit) void onSubmit();
             }}
             accessibilityLabel="Password"
             style={styles.input}
             placeholderTextColor={theme.textMuted}
             placeholder="Password"
           />
+          {authMode === 'register' ? (
+            <>
+              <TextInput
+                ref={confirmPasswordRef}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                textContentType="newPassword"
+                returnKeyType="next"
+                onSubmitEditing={() => inviteCodeRef.current?.focus()}
+                accessibilityLabel="Confirm password"
+                style={styles.input}
+                placeholderTextColor={theme.textMuted}
+                placeholder="Confirm password"
+              />
+              <TextInput
+                ref={inviteCodeRef}
+                value={inviteCode}
+                onChangeText={setInviteCode}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="go"
+                onSubmitEditing={() => {
+                  if (canSubmit) void onSubmit();
+                }}
+                accessibilityLabel="Invite code"
+                style={styles.input}
+                placeholderTextColor={theme.textMuted}
+                placeholder="Invite code"
+              />
+            </>
+          ) : null}
           {error ? (
             <Text style={styles.error} accessibilityRole="alert">
               {error}
@@ -131,7 +260,9 @@ export default function LoginScreen() {
             {busy ? (
               <ActivityIndicator color={theme.textPrimary} />
             ) : (
-              <Text style={styles.primaryBtnText}>Sign in</Text>
+              <Text style={styles.primaryBtnText}>
+                {authMode === 'login' ? 'Sign in' : 'Create account'}
+              </Text>
             )}
           </Pressable>
         </View>
@@ -161,6 +292,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   form: { gap: 16, marginBottom: 20 },
+  switcher: {
+    flexDirection: 'row',
+    gap: 4,
+    padding: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    backgroundColor: theme.bgSecondary,
+  },
+  switcherBtn: {
+    flex: 1,
+    minHeight: 38,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  switcherBtnOn: {
+    backgroundColor: theme.cardBg,
+    ...primaryBtnShadow,
+  },
+  switcherText: {
+    fontFamily: fonts.sansSemiBold,
+    fontSize: 14,
+    color: theme.textSecondary,
+  },
+  switcherTextOn: {
+    color: theme.textPrimary,
+  },
   input: {
     minHeight: 48,
     paddingHorizontal: 12,

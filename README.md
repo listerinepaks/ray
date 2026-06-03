@@ -35,10 +35,14 @@ The app uses **session auth**: sign in on the page (POST `/api/auth/login/` with
 
 - `GET` `/api/auth/csrf/` — sets `csrftoken` cookie (call before `POST` from the browser)
 - `POST` `/api/auth/login/` — body `{"username","password"}`, header `X-CSRFToken` when required
+- `POST` `/api/auth/register/` — body `{"username","password","display_name","email"?,"invite_code"?}`, creates the user and linked profile, then starts a session
+- `POST` `/api/auth/token/register/` — native registration; returns `{ "token", "id", "username", "email" }`
 - `POST` `/api/auth/logout/`
 - `GET` `/api/auth/me/` — `401` if anonymous
 - `GET` `/api/auth/users/` — `{ "users": [ { "id", "username" }, ... ] }` for custom sharing pickers (small deployments)
 - `GET`, `PATCH` `/api/profile/me/` — the signed-in user’s linked person/profile (`display_name`, `bio`, optional `avatar`)
+
+Set `RAY_REGISTRATION_ENABLED=0` to disable account creation. Set `RAY_REGISTRATION_INVITE_CODE` to require that code from web/mobile signup.
 
 **Photos (multipart, edit access on the moment)**
 

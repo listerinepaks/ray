@@ -5,6 +5,7 @@ import { Platform } from 'react-native';
 import {
   fetchMe,
   postTokenLogin,
+  postTokenRegister,
   postTokenRevoke,
   registerPushDevice,
   setApiToken,
@@ -18,6 +19,13 @@ type AuthContextValue = {
   user: Me | null;
   booting: boolean;
   login: (username: string, password: string) => Promise<void>;
+  register: (payload: {
+    username: string;
+    password: string;
+    display_name?: string;
+    email?: string;
+    invite_code?: string;
+  }) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -77,8 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [registeredPushToken, user]);
 
-  const login = useCallback(async (username: string, password: string) => {
-    const res = await postTokenLogin(username, password);
+  const storeAuthResult = useCallback(async (res: { token: string } & Me) => {
     await SecureStore.setItemAsync(TOKEN_KEY, res.token);
     setApiToken(res.token);
     setUser({
@@ -88,6 +95,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       groups: res.groups ?? [],
     });
   }, []);
+
+  const login = useCallback(async (username: string, password: string) => {
+    const res = await postTokenLogin(username, password);
+    await storeAuthResult(res);
+  }, [storeAuthResult]);
+
+  const register = useCallback(async (payload: {
+    username: string;
+    password: string;
+    display_name?: string;
+    email?: string;
+    invite_code?: string;
+  }) => {
+    const res = await postTokenRegister(payload);
+    await storeAuthResult(res);
+  }, [storeAuthResult]);
 
   const logout = useCallback(async () => {
     try {
@@ -101,8 +124,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, booting, login, logout }),
-    [user, booting, login, logout],
+    () => ({ user, booting, login, register, logout }),
+    [user, booting, login, register, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
