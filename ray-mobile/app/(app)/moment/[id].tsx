@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AspectFitImage } from '@/components/AspectFitImage';
 import { useAuth } from '@/contexts/AuthContext';
 import { fonts, theme } from '@/constants/theme';
-import { formatSmartDate } from '@/lib/formatSmartDate';
+import { formatSmartDate, formatSmartDateTime, formatSmartTimestamp } from '@/lib/formatSmartDate';
 import {
   createMomentComment,
   createMomentReaction,
@@ -71,19 +71,7 @@ function isOnOrBeforeToday(ymd: string): boolean {
 
 function formatCalculatedLight(iso: string | null | undefined): string | null {
   if (!iso) return null;
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return null;
-    return new Intl.DateTimeFormat(undefined, {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(d);
-  } catch {
-    return null;
-  }
+  return formatSmartDateTime(iso) || null;
 }
 
 const REACTION_TYPES = [
@@ -92,21 +80,6 @@ const REACTION_TYPES = [
   { type: 'wow', icon: 'flash' as const, label: 'Wow' },
 ] as const;
 const DOUBLE_TAP_WINDOW_MS = 300;
-
-function formatCommentTime(iso: string): string {
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '';
-    return new Intl.DateTimeFormat(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(d);
-  } catch {
-    return '';
-  }
-}
 
 export default function MomentEntryScreen() {
   const insets = useSafeAreaInsets();
@@ -374,9 +347,13 @@ export default function MomentEntryScreen() {
   const posterAvatarUri = moment.author_avatar ? mediaUrl(moment.author_avatar) : '';
   const isSelfMoment = currentUser != null && moment.author === currentUser.id;
   const authorRouteId = moment.author_person_id ?? moment.author;
-  const profileHref = isSelfMoment
-    ? '/profile'
-    : `/profile/${authorRouteId}`;
+  const openAuthorProfile = () => {
+    if (isSelfMoment) {
+      router.push('/profile');
+      return;
+    }
+    router.push({ pathname: '/profile/[id]', params: { id: String(authorRouteId) } });
+  };
 
   return (
     <KeyboardAvoidingView
@@ -388,32 +365,32 @@ export default function MomentEntryScreen() {
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 28) }}
         keyboardShouldPersistTaps="handled">
         <View style={styles.pad}>
-        <Pressable
-          onPress={() => router.push(profileHref)}
-          style={({ pressed }) => [styles.detailPoster, pressed && { opacity: 0.92 }]}>
-          {posterAvatarUri ? (
-            <Image source={{ uri: posterAvatarUri }} style={styles.detailPosterAvatar} />
-          ) : (
-            <View style={styles.detailPosterAvatarFallback}>
-              <Text style={styles.detailPosterAvatarLetter}>
-                {posterName.slice(0, 1).toUpperCase()}
-              </Text>
+          <Pressable
+            onPress={openAuthorProfile}
+            style={({ pressed }) => [styles.detailPoster, pressed && { opacity: 0.92 }]}>
+            {posterAvatarUri ? (
+              <Image source={{ uri: posterAvatarUri }} style={styles.detailPosterAvatar} />
+            ) : (
+              <View style={styles.detailPosterAvatarFallback}>
+                <Text style={styles.detailPosterAvatarLetter}>
+                  {posterName.slice(0, 1).toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <View style={styles.detailPosterMain}>
+              <View style={styles.detailPosterTopRow}>
+                <Text style={styles.detailPosterName} numberOfLines={1}>
+                  {posterName}
+                </Text>
+                {moment.moment_type === 'looking_ahead' ? (
+                  <View style={styles.lookingLabelInline} accessibilityLabel="Looking ahead">
+                    <Ionicons name="sparkles-outline" size={11} color={theme.textSecondary} />
+                    <Text style={styles.lookingLabelInlineText}>Looking ahead</Text>
+                  </View>
+                ) : null}
+              </View>
             </View>
-          )}
-          <View style={styles.detailPosterMain}>
-            <View style={styles.detailPosterTopRow}>
-              <Text style={styles.detailPosterName} numberOfLines={1}>
-                {posterName}
-              </Text>
-              {moment.moment_type === 'looking_ahead' ? (
-                <View style={styles.lookingLabelInline} accessibilityLabel="Looking ahead">
-                  <Ionicons name="sparkles-outline" size={11} color={theme.textSecondary} />
-                  <Text style={styles.lookingLabelInlineText}>Looking ahead</Text>
-                </View>
-              ) : null}
-            </View>
-          </View>
-        </Pressable>
+          </Pressable>
 
         {hero ? (
           <Pressable
@@ -590,7 +567,7 @@ export default function MomentEntryScreen() {
                       <Text style={styles.commentAuthor}>
                         {c.author_username ?? `User ${c.author}`}
                       </Text>
-                      <Text style={styles.commentTime}>{formatCommentTime(c.created_at)}</Text>
+                      <Text style={styles.commentTime}>{formatSmartTimestamp(c.created_at)}</Text>
                     </View>
                     <Text style={styles.commentBody}>{c.text}</Text>
                     {currentUser && c.author === currentUser.id ? (

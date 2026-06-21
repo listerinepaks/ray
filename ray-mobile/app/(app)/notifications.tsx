@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { fonts, theme } from '@/constants/theme';
 import { fetchNotifications, markAllNotificationsRead, mediaUrl, type NotificationItem } from '@/lib/api';
+import { formatSmartTimestamp } from '@/lib/formatSmartDate';
 
 function notificationCopy(item: NotificationItem): string {
   const actor = item.actor_username ?? 'Someone';
@@ -18,27 +19,6 @@ function notificationCopy(item: NotificationItem): string {
   if (item.type === 'moment_reacted') return `${actor} reacted to your moment.`;
   if (item.type === 'mentioned') return `${actor} mentioned you.`;
   return `${actor} sent you a notification.`;
-}
-
-function formatNotificationTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const now = Date.now();
-  const diffMs = now - d.getTime();
-  const min = Math.floor(diffMs / 60_000);
-  if (min < 1) return 'Just now';
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  if (hr < 48) return 'Yesterday';
-  const sameYear = d.getFullYear() === new Date(now).getFullYear();
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    ...(sameYear ? {} : { year: 'numeric' }),
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(d);
 }
 
 export default function NotificationsScreen() {
@@ -125,7 +105,7 @@ export default function NotificationsScreen() {
               )}
               <View style={styles.rowMain}>
                 <Text style={styles.rowText}>{notificationCopy(item)}</Text>
-                <Text style={styles.rowDate}>{formatNotificationTime(item.created_at)}</Text>
+                <Text style={styles.rowDate}>{formatSmartTimestamp(item.created_at)}</Text>
               </View>
               {!item.read_at ? <Ionicons name="ellipse" size={10} color={theme.accentPeach} /> : null}
             </Pressable>

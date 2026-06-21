@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AspectFitImage } from '../components/AspectFitImage'
 import { LocationPinIcon } from '../components/LocationPinIcon'
 import { SparklesIcon } from '../components/SparklesIcon'
-import { formatSmartDate } from '../formatSmartDate'
+import { formatSmartDate, formatSmartDateTime, formatSmartTimestamp } from '../formatSmartDate'
 import {
   createMomentComment,
   createMomentReaction,
@@ -57,34 +57,7 @@ function isOnOrBeforeToday(ymd: string): boolean {
 
 function formatCalculatedLight(iso: string | null | undefined): string | null {
   if (!iso) return null
-  try {
-    const d = new Date(iso)
-    if (Number.isNaN(d.getTime())) return null
-    return new Intl.DateTimeFormat(undefined, {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(d)
-  } catch {
-    return null
-  }
-}
-
-function formatCommentTime(iso: string): string {
-  try {
-    const d = new Date(iso)
-    if (Number.isNaN(d.getTime())) return ''
-    return new Intl.DateTimeFormat(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(d)
-  } catch {
-    return ''
-  }
+  return formatSmartDateTime(iso) || null
 }
 
 const REACTION_TYPES = [
@@ -598,7 +571,7 @@ export function EntryView({
                             {c.author_username ?? `User ${c.author}`}
                           </span>
                           <time className="entry-comment-time" dateTime={c.created_at}>
-                            {formatCommentTime(c.created_at)}
+                            {formatSmartTimestamp(c.created_at)}
                           </time>
                         </div>
                         <p className="entry-comment-body">{c.text}</p>
