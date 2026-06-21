@@ -7,12 +7,14 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,6 +36,7 @@ import {
   postConvertMoment,
   type Moment,
   type MomentComment,
+  type MomentPhoto,
   type MomentReaction,
 } from '@/lib/api';
 
@@ -83,6 +86,7 @@ const DOUBLE_TAP_WINDOW_MS = 300;
 
 export default function MomentEntryScreen() {
   const insets = useSafeAreaInsets();
+  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const headerHeight = useHeaderHeight();
   const router = useRouter();
   const navigation = useNavigation();
@@ -106,8 +110,14 @@ export default function MomentEntryScreen() {
   const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null);
   const [convertBusy, setConvertBusy] = useState(false);
   const [showHeartOverlay, setShowHeartOverlay] = useState(false);
+  const [fullscreenPhoto, setFullscreenPhoto] = useState<{
+    uri: string;
+    accessibilityLabel: string;
+    caption: string | null;
+  } | null>(null);
   const lastHeroTapAtRef = useRef(0);
   const heartOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heroOpenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (id == null) {
@@ -217,11 +227,27 @@ export default function MomentEntryScreen() {
     }
   }
 
-  function onHeroDoubleTapLike() {
-    if (!canCommentOrReact || reactionBusy) return;
+  function openPhotoFullscreen(photo: MomentPhoto, fallbackLabel: string) {
+    setFullscreenPhoto({
+      uri: mediaUrl(photo.image),
+      accessibilityLabel: photo.caption || fallbackLabel,
+      caption: photo.caption || null,
+    });
+  }
+
+  function onHeroPhotoPress(photo: MomentPhoto, fallbackLabel: string) {
+    if (!canCommentOrReact || reactionBusy) {
+      openPhotoFullscreen(photo, fallbackLabel);
+      return;
+    }
+
     const now = Date.now();
     if (now - lastHeroTapAtRef.current <= DOUBLE_TAP_WINDOW_MS) {
       lastHeroTapAtRef.current = 0;
+      if (heroOpenTimerRef.current) {
+        clearTimeout(heroOpenTimerRef.current);
+        heroOpenTimerRef.current = null;
+      }
       if (heartOverlayTimerRef.current) clearTimeout(heartOverlayTimerRef.current);
       setShowHeartOverlay(true);
       heartOverlayTimerRef.current = setTimeout(() => {
@@ -232,11 +258,18 @@ export default function MomentEntryScreen() {
       return;
     }
     lastHeroTapAtRef.current = now;
+    if (heroOpenTimerRef.current) clearTimeout(heroOpenTimerRef.current);
+    heroOpenTimerRef.current = setTimeout(() => {
+      lastHeroTapAtRef.current = 0;
+      heroOpenTimerRef.current = null;
+      openPhotoFullscreen(photo, fallbackLabel);
+    }, DOUBLE_TAP_WINDOW_MS);
   }
 
   useEffect(() => {
     return () => {
       if (heartOverlayTimerRef.current) clearTimeout(heartOverlayTimerRef.current);
+      if (heroOpenTimerRef.current) clearTimeout(heroOpenTimerRef.current);
     };
   }, []);
 
@@ -394,11 +427,13 @@ export default function MomentEntryScreen() {
 
         {hero ? (
           <Pressable
-            onPress={onHeroDoubleTapLike}
-            disabled={!canCommentOrReact || reactionBusy != null}
-            style={[
+            onPress={() => onHeroPhotoPress(hero, displayTitle)}
+            accessibilityRole="button"
+            accessibilityLabel={`Open photo fullscreen: ${hero.caption || displayTitle}`}
+            style={({ pressed }) => [
               styles.hero,
               moment.moment_type === 'looking_ahead' && styles.heroLookingAhead,
+              pressed && styles.photoPressed,
             ]}>
             <AspectFitImage
               uri={mediaUrl(hero.image)}
@@ -486,7 +521,16 @@ export default function MomentEntryScreen() {
           <View style={styles.gallery}>
             {rest.map((ph) => (
               <View key={ph.id} style={styles.galleryItem}>
-                <AspectFitImage uri={mediaUrl(ph.image)} />
+                <Pressable
+                  onPress={() => openPhotoFullscreen(ph, displayTitle)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open photo fullscreen: ${ph.caption || displayTitle}`}
+                  style={({ pressed }) => pressed && styles.photoPressed}>
+                  <AspectFitImage
+                    uri={mediaUrl(ph.image)}
+                    accessibilityLabel={ph.caption || displayTitle}
+                  />
+                </Pressable>
                 {ph.caption ? <Text style={styles.galleryCap}>{ph.caption}</Text> : null}
               </View>
             ))}
@@ -618,6 +662,56 @@ export default function MomentEntryScreen() {
         ) : null}
         </View>
       </ScrollView>
+
+      <Modal
+        visible={fullscreenPhoto != null}
+        animationType="fade"
+        presentationStyle="fullScreen"
+        supportedOrientations={['portrait', 'landscape']}
+        onRequestClose={() => setFullscreenPhoto(null)}>
+        <View style={styles.photoModalRoot}>
+          <ScrollView
+            style={styles.photoModalScroll}
+            contentContainerStyle={styles.photoModalContent}
+            centerContent
+            bouncesZoom
+            maximumZoomScale={4}
+            minimumZoomScale={1}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}>
+            {fullscreenPhoto ? (
+              <Image
+                source={{ uri: fullscreenPhoto.uri }}
+                accessibilityLabel={fullscreenPhoto.accessibilityLabel}
+                contentFit="contain"
+                transition={100}
+                style={[
+                  styles.photoModalImage,
+                  { width: viewportWidth, height: viewportHeight },
+                ]}
+              />
+            ) : null}
+          </ScrollView>
+          <Pressable
+            onPress={() => setFullscreenPhoto(null)}
+            accessibilityRole="button"
+            accessibilityLabel="Close fullscreen photo"
+            hitSlop={12}
+            style={[styles.photoModalClose, { top: insets.top + 12 }]}>
+            <Ionicons name="close" size={24} color="#fff" />
+          </Pressable>
+          {fullscreenPhoto?.caption ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.photoModalCaption,
+                { bottom: Math.max(insets.bottom, 20) },
+              ]}>
+              <Text style={styles.photoModalCaptionText}>{fullscreenPhoto.caption}</Text>
+            </View>
+          ) : null}
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -719,6 +813,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(242, 169, 123, 0.52)',
     backgroundColor: 'rgba(242, 169, 123, 0.12)',
+  },
+  photoPressed: {
+    opacity: 0.96,
   },
   heartOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -844,6 +941,49 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: theme.bgSecondary,
+  },
+  photoModalRoot: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  photoModalScroll: {
+    flex: 1,
+  },
+  photoModalContent: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoModalImage: {
+    backgroundColor: '#000',
+  },
+  photoModalClose: {
+    position: 'absolute',
+    right: 16,
+    zIndex: 3,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.24)',
+    backgroundColor: 'rgba(0, 0, 0, 0.54)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoModalCaption: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.62)',
+  },
+  photoModalCaptionText: {
+    fontFamily: fonts.sansRegular,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#fff',
   },
   galleryCap: {
     paddingHorizontal: 12,
