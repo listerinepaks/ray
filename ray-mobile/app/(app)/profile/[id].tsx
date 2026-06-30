@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { fonts, theme } from '@/constants/theme';
 import { fetchMoments, fetchPeople, fetchProfileByPerson, mediaUrl, type Moment, type Profile } from '@/lib/api';
+import { MEMORY_DISK_CACHE_POLICY } from '@/lib/imageCache';
 
 const GRID_GAP = 8;
 
@@ -118,7 +119,11 @@ export default function PersonProfileScreen() {
     <ScrollView contentContainerStyle={[styles.page, { paddingBottom: Math.max(insets.bottom, 24) }]}>
       <View style={styles.hero}>
         {avatarUri ? (
-          <Image source={{ uri: avatarUri }} style={styles.avatar} />
+          <Image
+            source={{ uri: avatarUri }}
+            cachePolicy={MEMORY_DISK_CACHE_POLICY}
+            style={styles.avatar}
+          />
         ) : (
           <View style={[styles.avatar, styles.avatarPlaceholder]}>
             <Text style={styles.avatarLetter}>{initial}</Text>

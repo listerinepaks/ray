@@ -46,6 +46,7 @@ import {
   type Moment,
   type Profile,
 } from '@/lib/api';
+import { MEMORY_DISK_CACHE_POLICY, prefetchImageUris } from '@/lib/imageCache';
 
 function formatKindLabel(kind: string): string {
   return kind === 'sunrise' ? 'Sunrise' : kind === 'sunset' ? 'Sunset' : kind;
@@ -168,6 +169,27 @@ export default function TimelineScreen() {
   }, [user]);
 
   useEffect(() => {
+    const uris: string[] = [];
+    const profileAvatar = mediaUrl(profile?.avatar);
+    if (profileAvatar) uris.push(profileAvatar);
+
+    for (const moment of moments) {
+      if (moment.author_avatar) uris.push(mediaUrl(moment.author_avatar));
+      const firstPhoto = moment.photos?.length
+        ? [...moment.photos].sort((a, b) => a.sort_order - b.sort_order)[0]
+        : null;
+      if (firstPhoto?.image) uris.push(mediaUrl(firstPhoto.image));
+    }
+
+    for (const row of pendingIncoming) {
+      const avatarUri = mediaUrl(row.requester_avatar);
+      if (avatarUri) uris.push(avatarUri);
+    }
+
+    prefetchImageUris(uris);
+  }, [moments, pendingIncoming, profile?.avatar]);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
@@ -251,7 +273,11 @@ export default function TimelineScreen() {
             accessibilityLabel="Profile"
             style={styles.headerAvatarButton}>
             {avatarUri ? (
-              <Image source={{ uri: avatarUri }} style={styles.headerAvatarImage} />
+              <Image
+                source={{ uri: avatarUri }}
+                cachePolicy={MEMORY_DISK_CACHE_POLICY}
+                style={styles.headerAvatarImage}
+              />
             ) : (
               <View style={styles.headerAvatarFallback}>
                 <Text style={styles.headerAvatarLetter}>
@@ -366,7 +392,11 @@ export default function TimelineScreen() {
             return (
               <View key={row.id} style={styles.friendReqRow}>
                 {avatarUri ? (
-                  <Image source={{ uri: avatarUri }} style={styles.friendReqAvatar} />
+                  <Image
+                    source={{ uri: avatarUri }}
+                    cachePolicy={MEMORY_DISK_CACHE_POLICY}
+                    style={styles.friendReqAvatar}
+                  />
                 ) : (
                   <View style={styles.friendReqAvatarFallback}>
                     <Text style={styles.friendReqAvatarLetter}>
@@ -459,7 +489,11 @@ export default function TimelineScreen() {
                 onPress={() => router.push(`/moment/${m.id}`)}
                 style={({ pressed }) => [styles.laSummaryRow, pressed && { opacity: 0.88 }]}>
                 {laAvatarUri ? (
-                  <Image source={{ uri: laAvatarUri }} style={styles.laSummaryAvatar} />
+                  <Image
+                    source={{ uri: laAvatarUri }}
+                    cachePolicy={MEMORY_DISK_CACHE_POLICY}
+                    style={styles.laSummaryAvatar}
+                  />
                 ) : (
                   <View style={styles.laSummaryAvatarFallback}>
                     <Text style={styles.laSummaryAvatarLetter}>
@@ -519,7 +553,11 @@ export default function TimelineScreen() {
                   m.moment_type === 'looking_ahead' && styles.cardPosterLookingAhead,
                 ]}>
                 {posterAvatarUri ? (
-                  <Image source={{ uri: posterAvatarUri }} style={styles.cardPosterAvatar} />
+                  <Image
+                    source={{ uri: posterAvatarUri }}
+                    cachePolicy={MEMORY_DISK_CACHE_POLICY}
+                    style={styles.cardPosterAvatar}
+                  />
                 ) : (
                   <View style={styles.cardPosterAvatarFallback}>
                     <Text style={styles.cardPosterAvatarLetter}>

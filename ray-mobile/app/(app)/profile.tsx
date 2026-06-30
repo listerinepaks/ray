@@ -21,6 +21,7 @@ import {
   type Moment,
   type Profile,
 } from '@/lib/api';
+import { MEMORY_DISK_CACHE_POLICY } from '@/lib/imageCache';
 
 const SPACE_SM = 12;
 const SPACE_MD = 16;
@@ -87,7 +88,11 @@ export default function ProfileScreen() {
             <View style={styles.publicPreviewCard}>
               <View style={styles.publicPreviewHead}>
                 {avatarUri ? (
-                  <Image source={{ uri: avatarUri }} style={styles.publicPreviewAvatar} />
+                  <Image
+                    source={{ uri: avatarUri }}
+                    cachePolicy={MEMORY_DISK_CACHE_POLICY}
+                    style={styles.publicPreviewAvatar}
+                  />
                 ) : (
                   <View style={[styles.publicPreviewAvatar, styles.avatarPlaceholder]}>
                     <Text style={styles.publicPreviewAvatarLetter}>

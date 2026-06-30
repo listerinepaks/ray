@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts, theme } from '@/constants/theme';
 import { fetchNotifications, markAllNotificationsRead, mediaUrl, type NotificationItem } from '@/lib/api';
 import { formatSmartTimestamp } from '@/lib/formatSmartDate';
+import { MEMORY_DISK_CACHE_POLICY } from '@/lib/imageCache';
 
 function notificationCopy(item: NotificationItem): string {
   const actor = item.actor_username ?? 'Someone';
@@ -97,7 +98,11 @@ export default function NotificationsScreen() {
                 if (item.moment) router.push(`/moment/${item.moment}`);
               }}>
               {avatar ? (
-                <Image source={{ uri: avatar }} style={styles.avatar} />
+                <Image
+                  source={{ uri: avatar }}
+                  cachePolicy={MEMORY_DISK_CACHE_POLICY}
+                  style={styles.avatar}
+                />
               ) : (
                 <View style={styles.avatarFallback}>
                   <Text style={styles.avatarLetter}>{actor.slice(0, 1).toUpperCase()}</Text>

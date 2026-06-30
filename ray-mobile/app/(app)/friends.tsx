@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Image } from 'expo-image';
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -25,6 +25,7 @@ import {
   type FriendshipList,
   type SharingUser,
 } from '@/lib/api';
+import { MEMORY_DISK_CACHE_POLICY } from '@/lib/imageCache';
 
 function otherUserId(row: Friendship, meId: number): number {
   return row.requester_id === meId ? row.addressee_id : row.requester_id;
@@ -45,7 +46,11 @@ function AvatarChip({
   return (
     <View style={styles.avatarWrap}>
       {uri ? (
-        <Image source={{ uri }} style={styles.avatarImg} />
+        <Image
+          source={{ uri }}
+          cachePolicy={MEMORY_DISK_CACHE_POLICY}
+          style={styles.avatarImg}
+        />
       ) : (
         <View style={[styles.avatarImg, styles.avatarFallback]}>
           <Text style={styles.avatarLetter}>{letter}</Text>

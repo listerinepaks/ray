@@ -27,6 +27,7 @@ import {
   type PhotoUpload,
   type Profile,
 } from '@/lib/api';
+import { MEMORY_DISK_CACHE_POLICY } from '@/lib/imageCache';
 import { compatibleImagePickerOptions, resizeForAvatar } from '@/lib/photoUpload';
 
 export default function EditProfileScreen() {
@@ -193,7 +194,11 @@ export default function EditProfileScreen() {
 
             <View style={styles.previewRow}>
               {avatarUri ? (
-                <Image source={{ uri: avatarUri }} style={styles.previewAvatar} />
+                <Image
+                  source={{ uri: avatarUri }}
+                  cachePolicy={MEMORY_DISK_CACHE_POLICY}
+                  style={styles.previewAvatar}
+                />
               ) : (
                 <View style={[styles.previewAvatar, styles.previewAvatarFallback]}>
                   <Text style={styles.previewAvatarLetter}>

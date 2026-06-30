@@ -39,6 +39,7 @@ import {
   type MomentPhoto,
   type MomentReaction,
 } from '@/lib/api';
+import { MEMORY_DISK_CACHE_POLICY, prefetchImageUris } from '@/lib/imageCache';
 
 function formatKindLabel(kind: string): string {
   return kind === 'sunrise' ? 'Sunrise' : kind === 'sunset' ? 'Sunset' : kind;
@@ -112,6 +113,7 @@ export default function MomentEntryScreen() {
   const [showHeartOverlay, setShowHeartOverlay] = useState(false);
   const [fullscreenPhoto, setFullscreenPhoto] = useState<{
     uri: string;
+    placeholderUri: string;
     accessibilityLabel: string;
     caption: string | null;
   } | null>(null);
@@ -186,6 +188,14 @@ export default function MomentEntryScreen() {
     };
   }, [moment?.id]);
 
+  useEffect(() => {
+    if (!moment) return;
+    prefetchImageUris([
+      moment.author_avatar ? mediaUrl(moment.author_avatar) : null,
+      ...moment.photos.map((photo) => mediaUrl(photo.image)),
+    ]);
+  }, [moment]);
+
   const canCommentOrReact =
     moment?.my_access === 'comment' || moment?.my_access === 'edit';
 
@@ -230,6 +240,7 @@ export default function MomentEntryScreen() {
   function openPhotoFullscreen(photo: MomentPhoto, fallbackLabel: string) {
     setFullscreenPhoto({
       uri: mediaUrl(photo.image),
+      placeholderUri: mediaUrl(photo.thumbnail),
       accessibilityLabel: photo.caption || fallbackLabel,
       caption: photo.caption || null,
     });
@@ -402,7 +413,11 @@ export default function MomentEntryScreen() {
             onPress={openAuthorProfile}
             style={({ pressed }) => [styles.detailPoster, pressed && { opacity: 0.92 }]}>
             {posterAvatarUri ? (
-              <Image source={{ uri: posterAvatarUri }} style={styles.detailPosterAvatar} />
+              <Image
+                source={{ uri: posterAvatarUri }}
+                cachePolicy={MEMORY_DISK_CACHE_POLICY}
+                style={styles.detailPosterAvatar}
+              />
             ) : (
               <View style={styles.detailPosterAvatarFallback}>
                 <Text style={styles.detailPosterAvatarLetter}>
@@ -437,6 +452,7 @@ export default function MomentEntryScreen() {
             ]}>
             <AspectFitImage
               uri={mediaUrl(hero.image)}
+              placeholderUri={mediaUrl(hero.thumbnail)}
               accessibilityLabel={hero.caption || displayTitle}
             />
             {showHeartOverlay ? (
@@ -528,6 +544,7 @@ export default function MomentEntryScreen() {
                   style={({ pressed }) => pressed && styles.photoPressed}>
                   <AspectFitImage
                     uri={mediaUrl(ph.image)}
+                    placeholderUri={mediaUrl(ph.thumbnail)}
                     accessibilityLabel={ph.caption || displayTitle}
                   />
                 </Pressable>
@@ -682,8 +699,14 @@ export default function MomentEntryScreen() {
             {fullscreenPhoto ? (
               <Image
                 source={{ uri: fullscreenPhoto.uri }}
+                placeholder={
+                  fullscreenPhoto.placeholderUri ? { uri: fullscreenPhoto.placeholderUri } : undefined
+                }
                 accessibilityLabel={fullscreenPhoto.accessibilityLabel}
                 contentFit="contain"
+                placeholderContentFit="contain"
+                cachePolicy={MEMORY_DISK_CACHE_POLICY}
+                recyclingKey={fullscreenPhoto.uri}
                 transition={100}
                 style={[
                   styles.photoModalImage,
