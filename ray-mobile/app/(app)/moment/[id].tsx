@@ -85,6 +85,17 @@ const REACTION_TYPES = [
 ] as const;
 const DOUBLE_TAP_WINDOW_MS = 300;
 
+type SocialActivityItem =
+  | { kind: 'comment'; createdAt: string; comment: MomentComment }
+  | { kind: 'reaction'; createdAt: string; reaction: MomentReaction };
+
+function reactionCopy(type: string): string {
+  if (type === 'heart') return 'loved this.';
+  if (type === 'glow') return 'felt the glow.';
+  if (type === 'wow') return 'said wow.';
+  return `reacted with ${type}.`;
+}
+
 export default function MomentEntryScreen() {
   const insets = useSafeAreaInsets();
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
@@ -195,6 +206,22 @@ export default function MomentEntryScreen() {
       ...moment.photos.map((photo) => mediaUrl(photo.image)),
     ]);
   }, [moment]);
+
+  const socialActivity = useMemo<SocialActivityItem[]>(() => {
+    const rows: SocialActivityItem[] = [
+      ...comments.map((comment) => ({
+        kind: 'comment' as const,
+        createdAt: comment.created_at,
+        comment,
+      })),
+      ...reactions.map((reaction) => ({
+        kind: 'reaction' as const,
+        createdAt: reaction.created_at,
+        reaction,
+      })),
+    ];
+    return rows.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+  }, [comments, reactions]);
 
   const canCommentOrReact =
     moment?.my_access === 'comment' || moment?.my_access === 'edit';
@@ -618,32 +645,64 @@ export default function MomentEntryScreen() {
             {!canCommentOrReact ? (
               <Text style={styles.socialHint}>View-only: you can see reactions but not add your own.</Text>
             ) : null}
-            {comments.length === 0 ? (
-              <Text style={styles.noComments}>No comments yet.</Text>
+            {socialActivity.length === 0 ? (
+              <Text style={styles.noComments}>No comments or reactions yet.</Text>
             ) : (
               <View style={styles.commentList}>
-                {comments.map((c) => (
-                  <View key={c.id} style={styles.commentCard}>
-                    <View style={styles.commentHead}>
-                      <Text style={styles.commentAuthor}>
-                        {c.author_username ?? `User ${c.author}`}
-                      </Text>
-                      <Text style={styles.commentTime}>{formatSmartTimestamp(c.created_at)}</Text>
-                    </View>
-                    <Text style={styles.commentBody}>{c.text}</Text>
-                    {currentUser && c.author === currentUser.id ? (
-                      <Pressable
-                        onPress={() => void onDeleteComment(c.id)}
-                        disabled={deletingCommentId === c.id}
-                        hitSlop={8}
-                        style={styles.commentDelete}>
-                        <Text style={styles.commentDeleteText}>
-                          {deletingCommentId === c.id ? 'Removing…' : 'Remove'}
+                {socialActivity.map((item) => {
+                  if (item.kind === 'reaction') {
+                    const r = item.reaction;
+                    return (
+                      <View key={`reaction-${r.id}`} style={styles.commentCard}>
+                        <View style={styles.commentHead}>
+                          <Text style={styles.commentAuthor}>
+                            {r.user_username ?? `User ${r.user}`}
+                          </Text>
+                          <Text style={styles.commentTime}>
+                            {formatSmartTimestamp(r.created_at)}
+                          </Text>
+                        </View>
+                        <View style={styles.reactionCommentBody}>
+                          <Ionicons
+                            name={
+                              REACTION_TYPES.find((candidate) => candidate.type === r.type)
+                                ?.icon ?? 'heart'
+                            }
+                            size={15}
+                            color={theme.textSecondary}
+                          />
+                          <Text style={styles.reactionCommentText}>
+                            {reactionCopy(r.type)}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  }
+
+                  const c = item.comment;
+                  return (
+                    <View key={`comment-${c.id}`} style={styles.commentCard}>
+                      <View style={styles.commentHead}>
+                        <Text style={styles.commentAuthor}>
+                          {c.author_username ?? `User ${c.author}`}
                         </Text>
-                      </Pressable>
-                    ) : null}
-                  </View>
-                ))}
+                        <Text style={styles.commentTime}>{formatSmartTimestamp(c.created_at)}</Text>
+                      </View>
+                      <Text style={styles.commentBody}>{c.text}</Text>
+                      {currentUser && c.author === currentUser.id ? (
+                        <Pressable
+                          onPress={() => void onDeleteComment(c.id)}
+                          disabled={deletingCommentId === c.id}
+                          hitSlop={8}
+                          style={styles.commentDelete}>
+                          <Text style={styles.commentDeleteText}>
+                            {deletingCommentId === c.id ? 'Removing…' : 'Remove'}
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  );
+                })}
               </View>
             )}
 
@@ -1117,6 +1176,17 @@ const styles = StyleSheet.create({
     color: theme.textMuted,
   },
   commentBody: {
+    fontFamily: fonts.sansRegular,
+    fontSize: 14,
+    lineHeight: 20,
+    color: theme.textPrimary,
+  },
+  reactionCommentBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  reactionCommentText: {
     fontFamily: fonts.sansRegular,
     fontSize: 14,
     lineHeight: 20,
