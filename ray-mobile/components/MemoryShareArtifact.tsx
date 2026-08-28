@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.bgSecondary,
   },
   textBlock: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'flex-end',
   },
   caption: {
