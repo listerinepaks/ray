@@ -55,6 +55,38 @@ function formatKindLabel(kind: string): string {
 type FeedTab = 'all' | 'looking_ahead' | 'friends' | 'mentions';
 const FEED_STALE_MS = 30_000;
 
+function apiDateLocalTime(date: string): number {
+  const parts = date.split('-').map(Number);
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return Number.NaN;
+  const [year, month, day] = parts;
+  return new Date(year!, month! - 1, day!).getTime();
+}
+
+function todayLocalTime(): number {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+}
+
+function isUpcomingLookingAhead(moment: Moment): boolean {
+  if (moment.moment_type !== 'looking_ahead') return false;
+  const dateTime = apiDateLocalTime(moment.date);
+  return !Number.isNaN(dateTime) && dateTime >= todayLocalTime();
+}
+
+function compareLookingAheadMoments(a: Moment, b: Moment): number {
+  const aUpcoming = isUpcomingLookingAhead(a);
+  const bUpcoming = isUpcomingLookingAhead(b);
+  if (aUpcoming !== bUpcoming) return aUpcoming ? -1 : 1;
+
+  const aTime = apiDateLocalTime(a.date);
+  const bTime = apiDateLocalTime(b.date);
+  const safeATime = Number.isNaN(aTime) ? Number.NEGATIVE_INFINITY : aTime;
+  const safeBTime = Number.isNaN(bTime) ? Number.NEGATIVE_INFINITY : bTime;
+
+  if (aUpcoming && bUpcoming) return safeATime - safeBTime || a.id - b.id;
+  return safeBTime - safeATime || b.id - a.id;
+}
+
 export default function TimelineScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -296,7 +328,7 @@ export default function TimelineScreen() {
       return moments
         .filter((m) => m.moment_type === 'looking_ahead')
         .slice()
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        .sort(compareLookingAheadMoments);
     }
     if (feedTab === 'friends') return moments.filter((m) => friendUserIds.has(m.author));
     if (feedTab === 'mentions') {
@@ -314,15 +346,17 @@ export default function TimelineScreen() {
   const lookingAheadSorted = useMemo(
     () =>
       moments
-        .filter((m) => m.moment_type === 'looking_ahead')
+        .filter(isUpcomingLookingAhead)
         .slice()
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+        .sort((a, b) => apiDateLocalTime(a.date) - apiDateLocalTime(b.date) || a.id - b.id),
     [moments],
   );
 
   const listMoments = useMemo(() => {
     if (feedTab !== 'all') return visibleMoments;
-    return visibleMoments.filter((m) => m.moment_type !== 'looking_ahead');
+    return visibleMoments.filter(
+      (m) => m.moment_type !== 'looking_ahead' || !isUpcomingLookingAhead(m),
+    );
   }, [feedTab, visibleMoments]);
 
   return (
