@@ -31,17 +31,17 @@ export async function registerForPushToken(): Promise<string | null> {
     console.info(`${LOG_PREFIX} Skipping push registration (platform=${Platform.OS}).`);
     return null;
   }
-  const perms = await Notifications.getPermissionsAsync();
-  let finalStatus = perms.status;
-  if (finalStatus !== 'granted') {
-    const asked = await Notifications.requestPermissionsAsync();
-    finalStatus = asked.status;
-  }
-  if (finalStatus !== 'granted') {
-    console.warn(`${LOG_PREFIX} Notification permission not granted (status=${finalStatus}).`);
-    return null;
-  }
   try {
+    const perms = await Notifications.getPermissionsAsync();
+    let finalStatus = perms.status;
+    if (finalStatus !== 'granted') {
+      const asked = await Notifications.requestPermissionsAsync();
+      finalStatus = asked.status;
+    }
+    if (finalStatus !== 'granted') {
+      console.warn(`${LOG_PREFIX} Notification permission not granted (status=${finalStatus}).`);
+      return null;
+    }
     const projectId = getProjectId();
     if (!projectId) {
       console.warn(
@@ -58,7 +58,7 @@ export async function registerForPushToken(): Promise<string | null> {
     }
     return data;
   } catch (err) {
-    console.warn(`${LOG_PREFIX} getExpoPushTokenAsync failed:`, err);
+    console.warn(`${LOG_PREFIX} Push permission or token registration failed:`, err);
     return null;
   }
 }

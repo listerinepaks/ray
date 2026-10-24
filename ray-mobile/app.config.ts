@@ -57,6 +57,11 @@ const base: ExpoConfig = {
         image: "../visual/splash-icon.png",
         resizeMode: "contain",
         backgroundColor: "#ffffff",
+        ios: {
+          // This is portrait launch artwork, not an icon for the default 100pt box.
+          enableFullScreenImage_legacy: true,
+          backgroundColor: "#faf7f2",
+        },
       },
     ],
     "expo-status-bar",

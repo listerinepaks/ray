@@ -284,3 +284,75 @@ test('five-minute focus freshness, immediate local changes, refresh override, an
     Date.now = realNow;
   }
 });
+
+test('push registration treats native permission and token failures as unavailable push', async () => {
+  const realWarn = console.warn;
+  const realInfo = console.info;
+  console.warn = () => {};
+  console.info = () => {};
+  try {
+    const scenarios = [
+      { get: async () => { throw new Error('Permission lookup failed'); }, requests: 0, tokens: 0 },
+      { get: async () => ({ status: 'undetermined' }), ask: async () => { throw new Error('ERR_PERMISSIONS_REQUEST_NOTIFICATIONS'); }, requests: 1, tokens: 0 },
+      { get: async () => ({ status: 'denied' }), ask: async () => ({ status: 'denied' }), requests: 1, tokens: 0 },
+      { get: async () => ({ status: 'granted' }), token: async () => { throw new Error('Push unavailable'); }, requests: 0, tokens: 1 },
+      { get: async () => ({ status: 'granted' }), token: async () => ({ data: 'ExponentPushToken[test]' }), requests: 0, tokens: 1, expected: 'ExponentPushToken[test]' },
+    ];
+    for (const scenario of scenarios) {
+      let requests = 0;
+      let tokens = 0;
+      const push = loadModule('lib/push.ts', {
+        'expo-constants': { default: { expoConfig: { extra: { eas: { projectId: 'test-project' } } } }, __esModule: true },
+        'react-native': { Platform: { OS: 'ios' } },
+        'expo-notifications': {
+          setNotificationHandler() {},
+          getPermissionsAsync: scenario.get,
+          requestPermissionsAsync: async () => { requests++; return scenario.ask(); },
+          getExpoPushTokenAsync: async () => { tokens++; return scenario.token(); },
+        },
+      });
+      assert.equal(await push.registerForPushToken(), scenario.expected || null);
+      assert.equal(requests, scenario.requests);
+      assert.equal(tokens, scenario.tokens);
+    }
+  } finally {
+    console.warn = realWarn;
+    console.info = realInfo;
+  }
+});
+
+test('unexpected push registration rejection cannot interrupt the authenticated app', async () => {
+  const warnings = [];
+  const realWarn = console.warn;
+  console.warn = (...args) => warnings.push(args);
+  let registrations = 0;
+  const auth = loadModule('contexts/AuthContext.tsx', {
+    'expo-secure-store': { getItemAsync: async () => 'token' },
+    'react-native': { Platform: { OS: 'ios' } },
+    '@/lib/api': {
+      setApiToken() {},
+      fetchMe: async () => ({ id: 1, username: 'Me', email: '' }),
+      registerPushDevice: async () => { registrations++; },
+    },
+    '@/lib/push': {
+      registerForPushToken: async () => { throw new Error('Unexpected native push failure'); },
+    },
+  });
+  function Screen() {
+    const { user, booting } = auth.useAuth();
+    return React.createElement('auth-state', { userId: user?.id, booting });
+  }
+  let tree;
+  try {
+    await act(async () => {
+      tree = create(React.createElement(auth.AuthProvider, null, React.createElement(Screen)));
+    });
+    assert.equal(tree.root.findByType('auth-state').props.userId, 1);
+    assert.equal(tree.root.findByType('auth-state').props.booting, false);
+    assert.equal(registrations, 0);
+    assert.equal(warnings.length, 1);
+  } finally {
+    if (tree) await act(async () => { tree.unmount(); });
+    console.warn = realWarn;
+  }
+});
