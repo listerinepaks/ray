@@ -105,11 +105,13 @@ journal,sunrise,sunset,photo,diary,moments,memories,private,nature,sharing,mindf
 
 ## Local build reminder
 
-After changing icons/splash paths in `app.json`, run a fresh native project generation before local Xcode builds:
+After changing icons, splash settings, or native plugins in `app.config.ts`, apply
+the configuration before local Xcode builds. SDK 57 clears the native directory
+by default, so use `--no-clean` to preserve local signing settings:
 
 ```bash
 cd ray-mobile
-npx expo prebuild --clean
+npx expo prebuild --platform ios --no-clean
 ```
 
 Before archiving in Xcode, sync native iOS version fields from `app-version.json`:
@@ -120,3 +122,14 @@ npm run prearchive:ios
 ```
 
 This updates `CFBundleVersion` / `CURRENT_PROJECT_VERSION` so Archive uses `iosBuildNumber`.
+
+### Xcode 27 / iOS 27
+
+SDK 57 requires Expo 57.0.23 or newer and the `expo-build-properties` plugin with
+`ios.enableSceneSupport: true` to support the UIKit scene lifecycle required by
+Xcode 27's SDK. Keep that setting in `app.config.ts`; changing only the generated
+Info.plist does not migrate React Native's window creation.
+
+After updating dependencies or this setting, run the prebuild command above,
+then `npm run prearchive:ios`, reopen `ios/RayMobile.xcworkspace`, and rebuild.
+Metro is needed for a Debug run; a Release run embeds its JavaScript bundle.

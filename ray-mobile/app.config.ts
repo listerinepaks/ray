@@ -43,6 +43,14 @@ const base: ExpoConfig = {
     favicon: "./assets/images/favicon.png",
   },
   plugins: [
+    [
+      "expo-build-properties",
+      {
+        ios: {
+          enableSceneSupport: true,
+        },
+      },
+    ],
     "expo-router",
     "expo-font",
     "expo-image",

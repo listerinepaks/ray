@@ -87,8 +87,8 @@ tasks:
       - sh: "command -v xcodebuild >/dev/null 2>&1"
         msg: "xcodebuild not found; run on your local Mac with Xcode installed."
     cmds:
+      - npx expo prebuild --platform ios --no-clean
       - npm run sync:version
-      - npx expo prebuild --platform ios
 
   verify:
     desc: Run core verification checks (api + web + mobile)
