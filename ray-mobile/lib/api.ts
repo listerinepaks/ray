@@ -58,6 +58,49 @@ function baseHeaders(json = false): Record<string, string> {
   return h;
 }
 
+type BlobFormData = FormData & {
+  append(name: string, value: Blob, fileName: string): void;
+};
+
+type LegacyFormDataFile = { uri: string; name: string; type: string };
+type LegacyFormData = FormData & {
+  append(name: string, value: LegacyFormDataFile): void;
+};
+
+export type PhotoUpload = LegacyFormDataFile;
+
+function usesBlobFormDataParts(body: FormData): boolean {
+  return typeof (body as { entries?: unknown }).entries === 'function';
+}
+
+async function uploadBlobFromFile(file: PhotoUpload): Promise<Blob> {
+  let res: Response;
+  try {
+    res = await fetch(file.uri);
+  } catch {
+    throw new Error(`Could not read ${file.name} for upload.`);
+  }
+
+  if (!res.ok && res.status !== 0) {
+    throw new Error(`Could not read ${file.name} for upload.`);
+  }
+
+  const blob = await res.blob();
+  const type = file.type || blob.type || 'application/octet-stream';
+  return blob.type === type ? blob : blob.slice(0, blob.size, type);
+}
+
+async function appendUploadFile(body: FormData, field: string, file: PhotoUpload): Promise<void> {
+  if (usesBlobFormDataParts(body)) {
+    // Expo SDK 57's fetch converter rejects React Native's legacy `{ uri }` FormData parts.
+    const blob = await uploadBlobFromFile(file);
+    (body as BlobFormData).append(field, blob, file.name);
+    return;
+  }
+
+  (body as LegacyFormData).append(field, file);
+}
+
 export type Me = {
   id: number;
   username: string;
@@ -150,10 +193,7 @@ export async function updateProfile(payload: {
   if (payload.display_name !== undefined) body.append('display_name', payload.display_name);
   if (payload.bio !== undefined) body.append('bio', payload.bio);
   if (payload.avatar) {
-    body.append(
-      'avatar',
-      { uri: payload.avatar.uri, name: payload.avatar.name, type: payload.avatar.type } as unknown as Blob,
-    );
+    await appendUploadFile(body, 'avatar', payload.avatar);
   }
   const res = await fetch(`${base}/api/profile/me/`, {
     method: 'PATCH',
@@ -592,8 +632,6 @@ export async function patchMomentPhoto(
   if (session === authSession) publishMomentFeedChange({ type: 'photo-upsert', momentId, photo });
 }
 
-export type PhotoUpload = { uri: string; name: string; type: string };
-
 export async function uploadMomentPhoto(
   momentId: number,
   file: PhotoUpload,
@@ -603,8 +641,7 @@ export async function uploadMomentPhoto(
   const session = authSession;
   const base = getApiBase();
   const body = new FormData();
-  // React Native file upload shape (not a web Blob)
-  body.append('image', { uri: file.uri, name: file.name, type: file.type } as unknown as Blob);
+  await appendUploadFile(body, 'image', file);
   body.append('caption', caption);
   body.append('sort_order', String(sortOrder));
   const res = await fetch(`${base}/api/moments/${momentId}/photos/`, {
