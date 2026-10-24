@@ -239,6 +239,42 @@ test('five-minute focus freshness, immediate local changes, refresh override, an
     assert(text().includes('Newest server version'));
     assert(!text().includes('Moment 1'), 'The superseded response cannot replace newer data');
 
+    const realWarn = console.warn;
+    const warnings = [];
+    console.warn = (...args) => warnings.push(args);
+    try {
+      let finishFriends;
+      api.fetchFriendships = () => new Promise((resolve) => { finishFriends = resolve; });
+      api.fetchNotifications = async () => { throw new Error('Notifications unavailable'); };
+      serverRows = [moment(3, { author: 2, title: 'Feed still available' })];
+      await act(async () => {
+        tree.root.findByType('scroll').props.refreshControl.props.onRefresh();
+      });
+      assert(text().includes('Feed still available'), 'Slow friends and failed notifications do not block moments');
+      assert.equal(tree.root.findByType('scroll').props.refreshControl.props.refreshing, false);
+      assert.equal(warnings.length, 1);
+      await act(async () => { finishFriends({ accepted: [{ requester_id: 1, addressee_id: 2 }], pending_incoming: [] }); });
+      await act(async () => { tree.root.findByProps({ accessibilityLabel: 'Friends moments' }).props.onPress(); });
+      assert(text().includes('Feed still available'));
+
+      api.fetchFriendships = async () => { throw new Error('Friends unavailable'); };
+      serverRows = [moment(3, { author: 2, title: 'Fresh despite friends failure' })];
+      await act(async () => {
+        tree.root.findByType('scroll').props.refreshControl.props.onRefresh();
+      });
+      assert(text().includes('Fresh despite friends failure'), 'A friends failure preserves the last known friends filter');
+      assert(text().includes('Could not refresh friends.'));
+
+      api.fetchMoments = async () => { throw new Error('Moments unavailable'); };
+      await act(async () => {
+        tree.root.findByType('scroll').props.refreshControl.props.onRefresh();
+      });
+      assert(text().includes('Moments unavailable'), 'Actual moments errors still surface');
+      assert(text().includes('Fresh despite friends failure'), 'A failed moments refresh preserves the visible list');
+    } finally {
+      console.warn = realWarn;
+    }
+
     await focus(false);
     await act(async () => { tree.unmount(); });
     tree = null;

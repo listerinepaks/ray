@@ -81,7 +81,7 @@ export default function TimelineScreen() {
   const [friendRequestError, setFriendRequestError] = useState<string | null>(null);
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const lastLoadedAtRef = useRef<number>(0);
-  const activeLoadRef = useRef<{ changes: MomentFeedChange[] } | null>(null);
+  const activeLoadRef = useRef<{ changes: MomentFeedChange[]; pending: boolean } | null>(null);
   const [feedRevision, setFeedRevision] = useState(0);
   const { width: screenWidth } = useWindowDimensions();
   const scrollProgress = useSharedValue(0);
@@ -105,26 +105,38 @@ export default function TimelineScreen() {
 
   const load = useCallback(async (force = false) => {
     // Focus checks share one request; explicit refreshes can supersede it.
-    if (activeLoadRef.current && !force) return;
-    const request = { changes: [] as MomentFeedChange[] };
+    if (activeLoadRef.current?.pending && !force) return;
+    const request = { changes: [] as MomentFeedChange[], pending: true };
     activeLoadRef.current = request;
     setError(null);
     setFriendRequestError(null);
-    try {
-      const [list, friendships, notifications] = await Promise.all([
-        fetchMoments(),
-        fetchFriendships(),
-        fetchNotifications(),
-      ]);
+    // These requests can finish independently; neither gates the moments list.
+    void fetchFriendships().then((friendships) => {
       if (activeLoadRef.current !== request) return;
-      setMoments(reconcileMomentFeed(list, request.changes));
       setPendingIncoming(friendships.pending_incoming ?? []);
-      setNotificationUnreadCount(notifications.unread_count ?? 0);
       const accepted = new Set<number>();
       for (const row of friendships.accepted) {
         accepted.add(row.requester_id === user?.id ? row.addressee_id : row.requester_id);
       }
       setFriendUserIds(accepted);
+    }).catch(() => {
+      if (activeLoadRef.current === request) {
+        setFriendRequestError('Could not refresh friends. Pull to refresh to try again.');
+      }
+    });
+    void fetchNotifications().then((notifications) => {
+      if (activeLoadRef.current === request) {
+        setNotificationUnreadCount(notifications.unread_count ?? 0);
+      }
+    }).catch((error) => {
+      if (activeLoadRef.current === request) {
+        console.warn('[Timeline] Could not refresh notifications.', error);
+      }
+    });
+    try {
+      const list = await fetchMoments();
+      if (activeLoadRef.current !== request) return;
+      setMoments(reconcileMomentFeed(list, request.changes));
       lastLoadedAtRef.current = request.changes.length ? 0 : Date.now();
     } catch (e) {
       if (activeLoadRef.current === request) {
@@ -132,7 +144,7 @@ export default function TimelineScreen() {
       }
     } finally {
       if (activeLoadRef.current === request) {
-        activeLoadRef.current = null;
+        request.pending = false;
         setLoading(false);
         setRefreshing(false);
       }
@@ -161,7 +173,7 @@ export default function TimelineScreen() {
     setMoments([]);
     setLoading(true);
     const unsubscribe = subscribeToMomentFeed((change) => {
-      activeLoadRef.current?.changes.push(change);
+      if (activeLoadRef.current?.pending) activeLoadRef.current.changes.push(change);
       setMoments((list) => applyMomentFeedChange(list, change));
       lastLoadedAtRef.current = 0;
       setFeedRevision((revision) => revision + 1);
