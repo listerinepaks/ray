@@ -17,6 +17,7 @@ import {
   type Profile as ProfileType,
 } from './api'
 import { RayLogo } from './components/RayLogo'
+import { FloatingLoveHeart } from './components/FloatingLoveHeart'
 import { SparklesIcon } from './components/SparklesIcon'
 import { CreateMoment } from './pages/CreateMoment'
 import { EntryView } from './pages/EntryView'
@@ -565,9 +566,7 @@ function App() {
       ) : null}
 
       {user.groups?.includes('love') ? (
-        <div className="floating-love-heart" aria-hidden>
-          ♥
-        </div>
+        <FloatingLoveHeart />
       ) : null}
     </div>
   )

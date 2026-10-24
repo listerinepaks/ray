@@ -8,6 +8,7 @@ The small re-export modules in each client preserve existing import paths.
 - feed.ts: tab membership, local-calendar Looking Ahead ordering, and separate upcoming summaries.
 - momentForm.ts: validation and API payloads, including the mobile photo requirement for new past moments.
 - photoRules.ts: JPEG quality and size limits, applied by each platform's image adapter.
+- loveHeart.ts: shared growth, hop geometry, burst particles, and timing for the love-group heart game.
 
 Web photo preparation uses the browser's supported image decoders. Mobile retains
 its native camera/library handling and metadata-based date autofill.
@@ -18,6 +19,6 @@ building or deploying either client from source.
 
 Run regression checks from the repository root:
 
-    node --test ray-shared/tests/domain.test.cjs ray-mobile/tests/moment-feed.test.cjs
+    node --test ray-shared/tests/*.test.cjs ray-mobile/tests/*.test.cjs
 
 The tests use the existing mobile development dependencies.

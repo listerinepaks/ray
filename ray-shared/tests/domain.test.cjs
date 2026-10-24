@@ -195,3 +195,24 @@ test('browser photo preparation applies shared JPEG rules and releases temporary
     URL.revokeObjectURL = original.revoke;
   }
 });
+
+test('love heart hops stay reachable as it grows, with a distinct next position', () => {
+  const { heartBounds, nextHeartPosition, clampHeart, heartSize, LOVE_HEART } = load('../loveHeart.ts');
+  const insets = { top: 54, right: 0, bottom: 34, left: 0 };
+  for (const [width, height] of [[393, 852], [852, 393], [320, 568], [1440, 900]]) {
+    let point = { x: width, y: height };
+    for (let tap = 0; tap < LOVE_HEART.taps; tap++) {
+      const bounds = heartBounds(width, height, tap, insets);
+      const previous = clampHeart(point, bounds);
+      point = nextHeartPosition(bounds, previous, () => 0.45);
+      assert(point.x >= bounds.minX && point.x <= bounds.maxX);
+      assert(point.y >= bounds.minY && point.y <= bounds.maxY);
+      const box = Math.max(44, heartSize(tap) + 12);
+      assert(point.x + box <= width - insets.right);
+      assert(point.y + box <= height - insets.bottom);
+      assert(Math.hypot(point.x - previous.x, point.y - previous.y) > 0);
+    }
+  }
+  assert(heartSize(4) > heartSize(3));
+  assert.equal(heartSize(5), heartSize(4));
+});
