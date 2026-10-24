@@ -1,11 +1,15 @@
+import { publishMomentFeedChange } from './momentFeed';
+
 /**
  * Django API client. Native uses `Authorization: Token …` (see `/api/auth/token/`).
  * Set `EXPO_PUBLIC_API_URL` (e.g. `http://192.168.1.10:8000` for a device on your LAN).
  */
 
 let authToken: string | null = null;
+let authSession = 0;
 
 export function setApiToken(token: string | null) {
+  if (token !== authToken) authSession += 1;
   authToken = token;
 }
 
@@ -505,6 +509,7 @@ export type CreateMomentPayload = {
 };
 
 export async function createMoment(payload: CreateMomentPayload): Promise<Moment> {
+  const session = authSession;
   const base = getApiBase();
   const res = await fetch(`${base}/api/moments/`, {
     method: 'POST',
@@ -512,10 +517,13 @@ export async function createMoment(payload: CreateMomentPayload): Promise<Moment
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(await parseErrorBody(res));
-  return res.json() as Promise<Moment>;
+  const moment = await res.json() as Moment;
+  if (session === authSession) publishMomentFeedChange({ type: 'upsert', moment });
+  return moment;
 }
 
 export async function updateMoment(id: number, payload: CreateMomentPayload): Promise<Moment> {
+  const session = authSession;
   const base = getApiBase();
   const res = await fetch(`${base}/api/moments/${id}/`, {
     method: 'PATCH',
@@ -523,13 +531,16 @@ export async function updateMoment(id: number, payload: CreateMomentPayload): Pr
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(await parseErrorBody(res));
-  return res.json() as Promise<Moment>;
+  const moment = await res.json() as Moment;
+  if (session === authSession) publishMomentFeedChange({ type: 'upsert', moment });
+  return moment;
 }
 
 export async function postConvertMoment(
   id: number,
   body: { reflection?: string } = {},
 ): Promise<Moment> {
+  const session = authSession;
   const base = getApiBase();
   const res = await fetch(`${base}/api/moments/${id}/convert/`, {
     method: 'POST',
@@ -537,25 +548,31 @@ export async function postConvertMoment(
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await parseErrorBody(res));
-  return res.json() as Promise<Moment>;
+  const moment = await res.json() as Moment;
+  if (session === authSession) publishMomentFeedChange({ type: 'upsert', moment });
+  return moment;
 }
 
 export async function deleteMoment(id: number): Promise<void> {
+  const session = authSession;
   const base = getApiBase();
   const res = await fetch(`${base}/api/moments/${id}/`, {
     method: 'DELETE',
     headers: baseHeaders(),
   });
   if (!res.ok) throw new Error(await parseErrorBody(res));
+  if (session === authSession) publishMomentFeedChange({ type: 'remove', momentId: id });
 }
 
 export async function deleteMomentPhoto(momentId: number, photoId: number): Promise<void> {
+  const session = authSession;
   const base = getApiBase();
   const res = await fetch(`${base}/api/moments/${momentId}/photos/${photoId}/`, {
     method: 'DELETE',
     headers: baseHeaders(),
   });
   if (!res.ok) throw new Error(await parseErrorBody(res));
+  if (session === authSession) publishMomentFeedChange({ type: 'photo-remove', momentId, photoId });
 }
 
 export async function patchMomentPhoto(
@@ -563,6 +580,7 @@ export async function patchMomentPhoto(
   photoId: number,
   payload: { caption: string },
 ): Promise<void> {
+  const session = authSession;
   const base = getApiBase();
   const res = await fetch(`${base}/api/moments/${momentId}/photos/${photoId}/`, {
     method: 'PATCH',
@@ -570,6 +588,8 @@ export async function patchMomentPhoto(
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(await parseErrorBody(res));
+  const photo = await res.json() as MomentPhoto;
+  if (session === authSession) publishMomentFeedChange({ type: 'photo-upsert', momentId, photo });
 }
 
 export type PhotoUpload = { uri: string; name: string; type: string };
@@ -580,6 +600,7 @@ export async function uploadMomentPhoto(
   caption: string,
   sortOrder: number,
 ): Promise<void> {
+  const session = authSession;
   const base = getApiBase();
   const body = new FormData();
   // React Native file upload shape (not a web Blob)
@@ -592,4 +613,6 @@ export async function uploadMomentPhoto(
     body,
   });
   if (!res.ok) throw new Error(await parseErrorBody(res));
+  const photo = await res.json() as MomentPhoto;
+  if (session === authSession) publishMomentFeedChange({ type: 'photo-upsert', momentId, photo });
 }

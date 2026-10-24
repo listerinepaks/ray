@@ -25,6 +25,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AspectFitImage } from '@/components/AspectFitImage';
+import { MomentPhotoCarousel } from '@/components/MomentPhotoCarousel';
 import { RayLogo } from '@/components/RayLogo';
 import { useAuth } from '@/contexts/AuthContext';
 import { fonts, theme } from '@/constants/theme';
@@ -46,14 +47,20 @@ import {
   type Moment,
   type Profile,
 } from '@/lib/api';
-import { MEMORY_DISK_CACHE_POLICY, prefetchImageUris } from '@/lib/imageCache';
+import { MEMORY_DISK_CACHE_POLICY } from '@/lib/imageCache';
+import {
+  applyMomentFeedChange,
+  FEED_STALE_MS,
+  reconcileMomentFeed,
+  subscribeToMomentFeed,
+  type MomentFeedChange,
+} from '@/lib/momentFeed';
 
 function formatKindLabel(kind: string): string {
   return kind === 'sunrise' ? 'Sunrise' : kind === 'sunset' ? 'Sunset' : kind;
 }
 
 type FeedTab = 'all' | 'looking_ahead' | 'friends' | 'mentions';
-const FEED_STALE_MS = 30_000;
 
 function apiDateLocalTime(date: string): number {
   const parts = date.split('-').map(Number);
@@ -106,6 +113,8 @@ export default function TimelineScreen() {
   const [friendRequestError, setFriendRequestError] = useState<string | null>(null);
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const lastLoadedAtRef = useRef<number>(0);
+  const activeLoadRef = useRef<{ changes: MomentFeedChange[] } | null>(null);
+  const [feedRevision, setFeedRevision] = useState(0);
   const { width: screenWidth } = useWindowDimensions();
   const scrollProgress = useSharedValue(0);
 
@@ -126,7 +135,11 @@ export default function TimelineScreen() {
     };
   });
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
+    // Focus checks share one request; explicit refreshes can supersede it.
+    if (activeLoadRef.current && !force) return;
+    const request = { changes: [] as MomentFeedChange[] };
+    activeLoadRef.current = request;
     setError(null);
     setFriendRequestError(null);
     try {
@@ -135,7 +148,8 @@ export default function TimelineScreen() {
         fetchFriendships(),
         fetchNotifications(),
       ]);
-      setMoments(list);
+      if (activeLoadRef.current !== request) return;
+      setMoments(reconcileMomentFeed(list, request.changes));
       setPendingIncoming(friendships.pending_incoming ?? []);
       setNotificationUnreadCount(notifications.unread_count ?? 0);
       const accepted = new Set<number>();
@@ -143,12 +157,17 @@ export default function TimelineScreen() {
         accepted.add(row.requester_id === user?.id ? row.addressee_id : row.requester_id);
       }
       setFriendUserIds(accepted);
-      lastLoadedAtRef.current = Date.now();
+      lastLoadedAtRef.current = request.changes.length ? 0 : Date.now();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load moments.');
+      if (activeLoadRef.current === request) {
+        setError(e instanceof Error ? e.message : 'Could not load moments.');
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (activeLoadRef.current === request) {
+        activeLoadRef.current = null;
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [user?.id]);
 
@@ -158,7 +177,7 @@ export default function TimelineScreen() {
       setFriendRequestBusyId(friendshipId);
       try {
         await acceptFriendRequest(friendshipId);
-        await load();
+        await load(true);
       } catch (e) {
         setFriendRequestError(e instanceof Error ? e.message : 'Could not accept request.');
       } finally {
@@ -169,16 +188,28 @@ export default function TimelineScreen() {
   );
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    // This subscription stays active while a detail screen or editor is on top.
+    lastLoadedAtRef.current = 0;
+    setMoments([]);
+    setLoading(true);
+    const unsubscribe = subscribeToMomentFeed((change) => {
+      activeLoadRef.current?.changes.push(change);
+      setMoments((list) => applyMomentFeedChange(list, change));
+      lastLoadedAtRef.current = 0;
+      setFeedRevision((revision) => revision + 1);
+    });
+    return () => {
+      unsubscribe();
+      activeLoadRef.current = null;
+    };
+  }, [user?.id]);
 
   useFocusEffect(
     useCallback(() => {
-      if (loading || refreshing) return;
       const ageMs = Date.now() - lastLoadedAtRef.current;
       if (lastLoadedAtRef.current > 0 && ageMs < FEED_STALE_MS) return;
       void load();
-    }, [load, loading, refreshing]),
+    }, [load, feedRevision]),
   );
 
   useEffect(() => {
@@ -199,27 +230,6 @@ export default function TimelineScreen() {
       cancelled = true;
     };
   }, [user]);
-
-  useEffect(() => {
-    const uris: string[] = [];
-    const profileAvatar = mediaUrl(profile?.avatar);
-    if (profileAvatar) uris.push(profileAvatar);
-
-    for (const moment of moments) {
-      if (moment.author_avatar) uris.push(mediaUrl(moment.author_avatar));
-      const firstPhoto = moment.photos?.length
-        ? [...moment.photos].sort((a, b) => a.sort_order - b.sort_order)[0]
-        : null;
-      if (firstPhoto?.image) uris.push(mediaUrl(firstPhoto.image));
-    }
-
-    for (const row of pendingIncoming) {
-      const avatarUri = mediaUrl(row.requester_avatar);
-      if (avatarUri) uris.push(avatarUri);
-    }
-
-    prefetchImageUris(uris);
-  }, [moments, pendingIncoming, profile?.avatar]);
 
   useEffect(() => {
     let cancelled = false;
@@ -387,7 +397,7 @@ export default function TimelineScreen() {
             refreshing={refreshing}
             onRefresh={() => {
               setRefreshing(true);
-              void load();
+              void load(true);
             }}
             tintColor={theme.textSecondary}
           />
@@ -566,22 +576,23 @@ export default function TimelineScreen() {
         {listMoments.map((m) => {
           const photos = m.photos ?? [];
           const thumb = photos.length
-            ? [...photos].sort((a, b) => a.sort_order - b.sort_order)[0]
+            ? [...photos].sort((a, b) => a.sort_order - b.sort_order || a.id - b.id)[0]
             : null;
           const commentCount = m.comments_count ?? 0;
           const reactionCount = m.reactions_count ?? 0;
           const posterName = m.author_username ?? `user_${m.author}`;
           const posterAvatarUri = m.author_avatar ? mediaUrl(m.author_avatar) : '';
           return (
-            <Pressable
+            <View
               key={m.id}
-              onPress={() => router.push(`/moment/${m.id}`)}
-              style={({ pressed }) => [
+              style={[
                 styles.card,
                 m.moment_type === 'looking_ahead' && styles.cardLookingAhead,
-                pressed && { opacity: 0.98 },
               ]}>
-              <View
+              <Pressable
+                onPress={() => router.push(`/moment/${m.id}`)}
+                accessibilityRole="button"
+                accessibilityLabel={`Open moment by ${posterName}`}
                 style={[
                   styles.cardPoster,
                   m.moment_type === 'looking_ahead' && styles.cardPosterLookingAhead,
@@ -612,77 +623,84 @@ export default function TimelineScreen() {
                     ) : null}
                   </View>
                 </View>
-              </View>
-              {thumb ? (
-                <View style={styles.thumbWrap}>
-                  <AspectFitImage uri={mediaUrl(thumb.thumbnail ?? thumb.image)} />
-                  {photos.length > 1 ? (
-                    <View style={styles.photoBadge}>
-                      <Text style={styles.photoBadgeText}>{photos.length} photos</Text>
-                    </View>
-                  ) : null}
-                </View>
+              </Pressable>
+              {photos.length > 1 ? (
+                <MomentPhotoCarousel photos={photos} onOpen={() => router.push(`/moment/${m.id}`)} />
+              ) : thumb ? (
+                <Pressable
+                  onPress={() => router.push(`/moment/${m.id}`)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open moment photo"
+                  style={styles.thumbWrap}>
+                  <AspectFitImage uri={mediaUrl(thumb.thumbnail || thumb.image)} />
+                </Pressable>
               ) : (
-                <View style={styles.placeholder} />
+                <Pressable
+                  onPress={() => router.push(`/moment/${m.id}`)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open moment"
+                  style={styles.placeholder} />
               )}
-              {m.moment_type === 'looking_ahead' && m.countdown_phrase ? (
-                <View style={styles.cardCountdownUnderThumb}>
-                  <Text style={styles.cardThumbCountdown}>{m.countdown_phrase}</Text>
-                </View>
-              ) : null}
-              <View style={styles.cardBody}>
-                <View style={styles.cardHead}>
-                  <Text style={styles.kind}>{formatKindLabel(m.kind)}</Text>
-                  <Text style={styles.date}>{formatSmartDate(m.date)}</Text>
-                  {m.my_access ? (
-                    <View style={styles.accessPill}>
-                      <Text style={styles.accessPillText}>{m.my_access}</Text>
-                    </View>
-                  ) : null}
-                </View>
-                {m.title ? (
-                  <Text style={styles.cardTitle}>{m.title}</Text>
-                ) : (
-                  <Text style={styles.cardTitle}>
-                    {formatKindLabel(m.kind)} · {formatSmartDate(m.date)}
-                  </Text>
-                )}
-                {m.bible_verse ? (
-                  <Text style={styles.bible}>
-                    {truncateWords(m.bible_verse, LIST_BIBLE_VERSE_MAX_WORDS)}
-                  </Text>
-                ) : null}
-                {m.location_name ? (
-                  <View style={styles.locationRow}>
-                    <Ionicons
-                      name="location-outline"
-                      size={17}
-                      color={theme.textMuted}
-                      style={styles.locationIcon}
-                    />
-                    <Text style={styles.location} numberOfLines={1}>
-                      {m.location_name}
-                    </Text>
+              <Pressable onPress={() => router.push(`/moment/${m.id}`)} accessibilityRole="button">
+                {m.moment_type === 'looking_ahead' && m.countdown_phrase ? (
+                  <View style={styles.cardCountdownUnderThumb}>
+                    <Text style={styles.cardThumbCountdown}>{m.countdown_phrase}</Text>
                   </View>
                 ) : null}
-                {m.reflection ? (
-                  <Text style={styles.reflection}>
-                    {truncateWords(m.reflection, LIST_REFLECTION_MAX_WORDS)}
-                  </Text>
-                ) : null}
-                <View style={styles.cardSocial} accessibilityLabel={`${commentCount} comments, ${reactionCount} reactions`}>
-                  <Ionicons name="chatbubble-outline" size={15} color={theme.textMuted} />
-                  <Text style={styles.cardSocialText}>{commentCount}</Text>
-                  <Ionicons
-                    name="heart-outline"
-                    size={15}
-                    color={theme.textMuted}
-                    style={styles.cardSocialIconSecond}
-                  />
-                  <Text style={styles.cardSocialText}>{reactionCount}</Text>
+                <View style={styles.cardBody}>
+                  <View style={styles.cardHead}>
+                    <Text style={styles.kind}>{formatKindLabel(m.kind)}</Text>
+                    <Text style={styles.date}>{formatSmartDate(m.date)}</Text>
+                    {m.my_access ? (
+                      <View style={styles.accessPill}>
+                        <Text style={styles.accessPillText}>{m.my_access}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  {m.title ? (
+                    <Text style={styles.cardTitle}>{m.title}</Text>
+                  ) : (
+                    <Text style={styles.cardTitle}>
+                      {formatKindLabel(m.kind)} · {formatSmartDate(m.date)}
+                    </Text>
+                  )}
+                  {m.bible_verse ? (
+                    <Text style={styles.bible}>
+                      {truncateWords(m.bible_verse, LIST_BIBLE_VERSE_MAX_WORDS)}
+                    </Text>
+                  ) : null}
+                  {m.location_name ? (
+                    <View style={styles.locationRow}>
+                      <Ionicons
+                        name="location-outline"
+                        size={17}
+                        color={theme.textMuted}
+                        style={styles.locationIcon}
+                      />
+                      <Text style={styles.location} numberOfLines={1}>
+                        {m.location_name}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {m.reflection ? (
+                    <Text style={styles.reflection}>
+                      {truncateWords(m.reflection, LIST_REFLECTION_MAX_WORDS)}
+                    </Text>
+                  ) : null}
+                  <View style={styles.cardSocial} accessibilityLabel={`${commentCount} comments, ${reactionCount} reactions`}>
+                    <Ionicons name="chatbubble-outline" size={15} color={theme.textMuted} />
+                    <Text style={styles.cardSocialText}>{commentCount}</Text>
+                    <Ionicons
+                      name="heart-outline"
+                      size={15}
+                      color={theme.textMuted}
+                      style={styles.cardSocialIconSecond}
+                    />
+                    <Text style={styles.cardSocialText}>{reactionCount}</Text>
+                  </View>
                 </View>
-              </View>
-            </Pressable>
+              </Pressable>
+            </View>
           );
         })}
       </View>
@@ -1093,21 +1111,6 @@ const styles = StyleSheet.create({
   thumbWrap: {
     width: '100%',
     backgroundColor: theme.bgSecondary,
-  },
-  photoBadge: {
-    position: 'absolute',
-    right: 10,
-    bottom: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: 'rgba(20, 22, 28, 0.55)',
-  },
-  photoBadgeText: {
-    fontFamily: fonts.sansSemiBold,
-    fontSize: 11,
-    color: '#fff',
-    letterSpacing: 0.3,
   },
   placeholder: {
     width: '100%',

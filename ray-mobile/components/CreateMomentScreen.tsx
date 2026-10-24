@@ -593,7 +593,7 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
                 setSubmitError(null);
                 setDeleting(true);
                 await deleteMoment(editId);
-                router.replace('/');
+                router.dismissTo('/');
               } catch (err) {
                 setSubmitError(err instanceof Error ? err.message : 'Could not delete moment.');
               } finally {

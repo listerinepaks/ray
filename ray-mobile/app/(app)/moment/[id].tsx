@@ -203,7 +203,6 @@ export default function MomentEntryScreen() {
     if (!moment) return;
     prefetchImageUris([
       moment.author_avatar ? mediaUrl(moment.author_avatar) : null,
-      ...moment.photos.map((photo) => mediaUrl(photo.image)),
     ]);
   }, [moment]);
 
