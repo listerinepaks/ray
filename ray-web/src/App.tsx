@@ -1,3 +1,4 @@
+import { selectFeedMoments, selectUpcomingMoments, selectTimelineMoments, type FeedTab } from './feed';
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
@@ -25,7 +26,6 @@ import { Profile } from './pages/Profile'
 import { Timeline } from './pages/Timeline'
 import './App.css'
 
-type FeedTab = 'all' | 'looking_ahead' | 'friends' | 'mentions'
 type AuthMode = 'login' | 'register'
 
 function parseFeedTabParam(value: string | null): FeedTab | null {
@@ -33,38 +33,6 @@ function parseFeedTabParam(value: string | null): FeedTab | null {
     return value
   }
   return null
-}
-
-function apiDateLocalTime(date: string): number {
-  const parts = date.split('-').map(Number)
-  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return Number.NaN
-  const [year, month, day] = parts
-  return new Date(year!, month! - 1, day!).getTime()
-}
-
-function todayLocalTime(): number {
-  const now = new Date()
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-}
-
-function isUpcomingLookingAhead(moment: Moment): boolean {
-  if (moment.moment_type !== 'looking_ahead') return false
-  const dateTime = apiDateLocalTime(moment.date)
-  return !Number.isNaN(dateTime) && dateTime >= todayLocalTime()
-}
-
-function compareLookingAheadMoments(a: Moment, b: Moment): number {
-  const aUpcoming = isUpcomingLookingAhead(a)
-  const bUpcoming = isUpcomingLookingAhead(b)
-  if (aUpcoming !== bUpcoming) return aUpcoming ? -1 : 1
-
-  const aTime = apiDateLocalTime(a.date)
-  const bTime = apiDateLocalTime(b.date)
-  const safeATime = Number.isNaN(aTime) ? Number.NEGATIVE_INFINITY : aTime
-  const safeBTime = Number.isNaN(bTime) ? Number.NEGATIVE_INFINITY : bTime
-
-  if (aUpcoming && bUpcoming) return safeATime - safeBTime || a.id - b.id
-  return safeBTime - safeATime || b.id - a.id
 }
 
 function App() {
@@ -161,42 +129,21 @@ function App() {
     }
   }, [user])
 
-  const visibleMoments = useMemo(() => {
-    if (!user) return []
-    if (feedTab === 'looking_ahead') {
-      return moments
-        .filter((m) => m.moment_type === 'looking_ahead')
-        .slice()
-        .sort(compareLookingAheadMoments)
-    }
-    if (feedTab === 'friends') return moments.filter((m) => friendUserIds.has(m.author))
-    if (feedTab === 'mentions') {
-      return moments.filter((m) =>
-        m.tagged_people.some(
-          (p) =>
-            (user.id != null && p.linked_user === user.id) ||
-            (profile?.person_id != null && p.id === profile.person_id),
-        ),
-      )
-    }
-    return moments
-  }, [user, feedTab, friendUserIds, moments, profile?.person_id])
+  const visibleMoments = useMemo(
+    () => user?.id == null ? [] : selectFeedMoments(moments, feedTab, {
+      userId: user?.id,
+      personId: profile?.person_id,
+      friendUserIds,
+    }),
+    [feedTab, friendUserIds, moments, profile?.person_id, user?.id],
+  );
 
-  const lookingAheadSorted = useMemo(
-    () =>
-      moments
-        .filter(isUpcomingLookingAhead)
-        .slice()
-        .sort((a, b) => apiDateLocalTime(a.date) - apiDateLocalTime(b.date) || a.id - b.id),
-    [moments],
-  )
+  const lookingAheadSorted = useMemo(() => selectUpcomingMoments(moments), [moments]);
 
-  const momentsForTimeline = useMemo(() => {
-    if (!user || feedTab !== 'all') return visibleMoments
-    return visibleMoments.filter(
-      (m) => m.moment_type !== 'looking_ahead' || !isUpcomingLookingAhead(m),
-    )
-  }, [user, feedTab, visibleMoments])
+  const momentsForTimeline = useMemo(
+    () => selectTimelineMoments(visibleMoments, feedTab),
+    [feedTab, visibleMoments],
+  );
 
   const lookingAheadSummary = useMemo(() => {
     if (!user || feedTab !== 'all' || lookingAheadSorted.length === 0) return null

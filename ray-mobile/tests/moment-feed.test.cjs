@@ -17,6 +17,7 @@ function loadModule(file, imports = {}) {
   const module = { exports: {} };
   new Function('require', 'module', 'exports', outputText)((name) => {
     if (name in imports) return imports[name];
+    if (name.startsWith('.')) return loadModule(path.join(path.dirname(file), name + '.ts'), imports);
     if (name === 'react' || name === 'react/jsx-runtime') return require(name);
     throw new Error('Unexpected import: ' + name);
   }, module, module.exports);
@@ -161,6 +162,7 @@ test('five-minute focus freshness, immediate local changes, refresh override, an
     '@/lib/api': api,
     '@/lib/imageCache': { MEMORY_DISK_CACHE_POLICY: 'memory-disk' },
     '@/lib/momentFeed': feed,
+    '@/lib/feed': loadModule('lib/feed.ts'),
   });
   let tree;
   const text = () => tree.root.findAllByType('text')
