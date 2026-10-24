@@ -1,3 +1,6 @@
+import { MOMENT_MAX_PX } from '../../../ray-shared/photoRules';
+import { preparePhoto } from '../photoUpload';
+import { buildMomentPayload, validateMomentForm } from '../../../ray-shared/momentForm';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -13,7 +16,6 @@ import {
   patchMomentPhoto,
   updateMoment,
   uploadMomentPhoto,
-  type CreateMomentPayload,
   type Me,
   type MomentPhoto,
   type Person,
@@ -334,67 +336,32 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
     }
   }
 
-  function buildPayload(): CreateMomentPayload {
-    const payload: CreateMomentPayload = {
-      kind,
-      date,
-      visibility_mode: visibility,
-      title: title.trim() || undefined,
-      bible_verse: bibleVerse.trim(),
-      reflection: reflection.trim() || undefined,
-      location_name: locationName.trim() || undefined,
-    }
-    if (!isEdit) {
-      payload.moment_type = momentType
-    }
-    if (observedAt.trim()) {
-      const d = new Date(observedAt)
-      if (!Number.isNaN(d.getTime())) payload.observed_at = d.toISOString()
-    } else {
-      payload.observed_at = null
-    }
-
-    if (visibility === VIS.tagged) {
-      payload.people = [...selectedPeople].map((person_id) => ({
-        person_id,
-        role: 'present',
-      }))
-    } else {
-      payload.people = []
-    }
-    if (visibility === VIS.custom) {
-      payload.access = customRows
-        .filter((r) => r.userId > 0)
-        .map((r) => ({
-          user_id: r.userId,
-          access_level: r.accessLevel,
-        }))
-    }
-    return payload
+  function formValues() {
+    return {
+      isEdit, momentType, kind, date, observedAt, title, bibleVerse,
+      reflection, locationName, visibility, selectedPeople, customRows,
+    };
   }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setSubmitError(null)
 
-    if (visibility === VIS.tagged && selectedPeople.size === 0) {
-      setSubmitError(
-        'Choose at least one person to tag, or switch to Friends or Private visibility.',
-      )
-      return
-    }
-    if (visibility === VIS.custom) {
-      const valid = customRows.filter((r) => r.userId > 0)
-      if (valid.length === 0) {
-        setSubmitError('Add at least one person and access level for custom sharing.')
-        return
-      }
+    const validationError = validateMomentForm(formValues(), photos.length + existingPhotos.length);
+    if (validationError) {
+      setSubmitError(validationError);
+      return;
     }
 
     setSubmitting(true)
     setUploadPhase(null)
     try {
-      const payload = buildPayload()
+      const preparedPhotos: File[] = []
+      for (let i = 0; i < photos.length; i++) {
+        setUploadPhase('Preparing photo ' + (i + 1) + ' of ' + photos.length + '…')
+        preparedPhotos.push(await preparePhoto(photos[i].file, MOMENT_MAX_PX))
+      }
+      const payload = buildMomentPayload(formValues())
 
       if (isEdit && editId != null) {
         await updateMoment(editId, payload)
@@ -404,7 +371,7 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
         for (let i = 0; i < photos.length; i++) {
           const ph = photos[i]!
           setUploadPhase(`Uploading photo ${i + 1} of ${photos.length}…`)
-          await uploadMomentPhoto(editId, ph.file, ph.caption.trim(), existingPhotos.length + i)
+          await uploadMomentPhoto(editId, preparedPhotos[i], ph.caption.trim(), existingPhotos.length + i)
         }
         navigate(`/moments/${editId}`, { replace: true })
       } else {
@@ -413,7 +380,7 @@ export function CreateMoment({ currentUser }: { currentUser: Me }) {
         for (let i = 0; i < photos.length; i++) {
           const ph = photos[i]!
           setUploadPhase(`Uploading photo ${i + 1} of ${photos.length}…`)
-          await uploadMomentPhoto(created.id, ph.file, ph.caption.trim(), i)
+          await uploadMomentPhoto(created.id, preparedPhotos[i], ph.caption.trim(), i)
         }
 
         navigate(`/moments/${created.id}`, { replace: true })

@@ -98,3 +98,100 @@ test('both feeds preserve mobile sorting, tab membership, and separate upcoming 
   }
   assert.deepEqual(moments, original, 'Selecting and sorting never changes the input list');
 });
+
+test('shared forms use mobile validation and preserve edit and sharing payload semantics', () => {
+  const { validateMomentForm, buildMomentPayload } = load('../momentForm.ts');
+  const form = {
+    isEdit: false, momentType: 'past', kind: 'sunrise', date: '2026-10-24',
+    observedAt: '', title: '  Title  ', bibleVerse: '  Verse  ', reflection: '  ',
+    locationName: '  Beach ', visibility: 'private', selectedPeople: new Set(), customRows: [],
+  };
+  assert.match(validateMomentForm(form, 0), /at least one photo/);
+  assert.equal(validateMomentForm(form, 1), null);
+  assert.equal(validateMomentForm({ ...form, isEdit: true }, 0), null);
+  assert.equal(validateMomentForm({ ...form, momentType: 'looking_ahead' }, 0), null);
+  assert.match(validateMomentForm({ ...form, visibility: 'tagged' }, 1), /person to tag/);
+  assert.match(validateMomentForm({ ...form, visibility: 'custom', customRows: [{ userId: 0 }] }, 1), /at least one person/);
+  const payload = buildMomentPayload(form);
+  assert.equal(payload.title, 'Title');
+  assert.equal(payload.bible_verse, 'Verse');
+  assert.equal(payload.location_name, 'Beach');
+  assert.equal(payload.reflection, undefined);
+  assert.equal(payload.observed_at, null);
+  assert.equal(payload.moment_type, 'past');
+  assert.deepEqual(payload.people, []);
+  assert(!('access' in payload));
+  const tagged = { ...form, isEdit: true, visibility: 'tagged', selectedPeople: new Set([10, 20]) };
+  assert.equal(validateMomentForm(tagged, 0), null);
+  assert.deepEqual(buildMomentPayload(tagged).people, [{ person_id: 10, role: 'present' }, { person_id: 20, role: 'present' }]);
+  assert(!('moment_type' in buildMomentPayload(tagged)), 'Editing cannot change the moment type without conversion');
+  const custom = { ...form, visibility: 'custom', customRows: [{ userId: 0, accessLevel: 'view' }, { userId: 2, accessLevel: 'comment' }] };
+  assert.equal(validateMomentForm(custom, 1), null);
+  assert.deepEqual(buildMomentPayload(custom).access, [{ user_id: 2, access_level: 'comment' }]);
+});
+
+test('photo rules preserve aspect ratio, avoid upscaling, and match native size limits', () => {
+  const rules = load('../photoRules.ts');
+  assert.equal(rules.PHOTO_JPEG_QUALITY, 0.85);
+  assert.deepEqual(rules.fitImageDimensions(4000, 3000, rules.MOMENT_MAX_PX), { width: 1600, height: 1200 });
+  assert.deepEqual(rules.fitImageDimensions(3000, 4000, rules.MOMENT_MAX_PX), { width: 1200, height: 1600 });
+  assert.deepEqual(rules.fitImageDimensions(1200, 1200, rules.AVATAR_MAX_PX), { width: 600, height: 600 });
+  assert.deepEqual(rules.fitImageDimensions(200, 100, rules.MOMENT_MAX_PX), { width: 200, height: 100 });
+  assert.throws(() => rules.fitImageDimensions(0, 100, 1600));
+});
+
+test('browser photo preparation applies shared JPEG rules and releases temporary URLs on failure', async () => {
+  const { File } = require('node:buffer');
+  const original = {
+    Image: global.Image, document: global.document, File: global.File,
+    create: URL.createObjectURL, revoke: URL.revokeObjectURL,
+  };
+  const revoked = [];
+  const draws = [];
+  let decodeFailure = false;
+  let canvasFailure = false;
+  let canvas;
+  global.File = File;
+  URL.createObjectURL = () => 'blob:test-photo';
+  URL.revokeObjectURL = (uri) => revoked.push(uri);
+  global.Image = class {
+    naturalWidth = 4000;
+    naturalHeight = 3000;
+    set src(_) { queueMicrotask(() => decodeFailure ? this.onerror() : this.onload()); }
+  };
+  global.document = {
+    createElement: () => {
+      canvas = {
+        getContext: () => ({ fillRect() {}, drawImage: (...args) => draws.push(args) }),
+        toBlob: (callback, type, quality) => {
+          assert.equal(type, 'image/jpeg');
+          assert.equal(quality, 0.85);
+          callback(canvasFailure ? null : new Blob(['jpeg'], { type }));
+        },
+      };
+      return canvas;
+    },
+  };
+  try {
+    const { preparePhoto } = load('../../ray-web/src/photoUpload.ts');
+    const file = new File(['original'], 'Sunset.png', { type: 'image/png', lastModified: 1234 });
+    const result = await preparePhoto(file, 1600);
+    assert.equal(result.name, 'Sunset.jpg');
+    assert.equal(result.type, 'image/jpeg');
+    assert.equal(result.lastModified, 1234);
+    assert.deepEqual([canvas.width, canvas.height], [1600, 1200]);
+    assert.deepEqual(draws[0].slice(1), [0, 0, 1600, 1200]);
+    decodeFailure = true;
+    await assert.rejects(preparePhoto(file, 600), /Could not read Sunset.png/);
+    decodeFailure = false;
+    canvasFailure = true;
+    await assert.rejects(preparePhoto(file, 600), /Could not prepare Sunset.png/);
+    assert.equal(revoked.length, 3);
+  } finally {
+    global.Image = original.Image;
+    global.document = original.document;
+    global.File = original.File;
+    URL.createObjectURL = original.create;
+    URL.revokeObjectURL = original.revoke;
+  }
+});

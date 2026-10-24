@@ -6,6 +6,11 @@ The small re-export modules in each client preserve existing import paths.
 - types.ts: common API data, based on mobile; authentication and upload transports stay in each client.
 - formatSmartDate.ts, truncateWords.ts: the existing mobile presentation rules.
 - feed.ts: tab membership, local-calendar Looking Ahead ordering, and separate upcoming summaries.
+- momentForm.ts: validation and API payloads, including the mobile photo requirement for new past moments.
+- photoRules.ts: JPEG quality and size limits, applied by each platform's image adapter.
+
+Web photo preparation uses the browser's supported image decoders. Mobile retains
+its native camera/library handling and metadata-based date autofill.
 
 Metro watches this directory, and Vite permits it in development. No separate
 package installation or build step is required. Include ray-shared when

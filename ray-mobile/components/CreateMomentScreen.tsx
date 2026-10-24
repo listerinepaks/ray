@@ -1,3 +1,4 @@
+import { buildMomentPayload, validateMomentForm } from '../../ray-shared/momentForm';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
@@ -33,7 +34,6 @@ import {
   patchMomentPhoto,
   updateMoment,
   uploadMomentPhoto,
-  type CreateMomentPayload,
   type MomentPhoto,
   type Person,
   type PhotoUpload,
@@ -55,6 +55,7 @@ const ACCESS_LEVELS = [
 ];
 
 type PhotoDraft = {
+  prepared: Promise<PhotoUpload>;
   key: string;
   uri: string;
   caption: string;
@@ -308,7 +309,8 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
       // Add immediately with original URIs for instant preview feedback.
       const drafts: PhotoDraft[] = assets.map((a, i) => {
         const upload = photoUploadFromAsset(a, `photo-${i}.jpg`);
-        return { key: newKey(), uri: upload.uri, caption: '', name: upload.name, type: upload.type };
+        return { key: newKey(), uri: upload.uri, caption: '', name: upload.name, type: upload.type,
+          prepared: resizeForMomentPhoto(a, upload.name) };
       });
       setPhotos((prev) => [...prev, ...drafts]);
 
@@ -320,7 +322,7 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
       }
 
       // Resize in background; update drafts with compressed versions before upload.
-      void Promise.all(assets.map((a, i) => resizeForMomentPhoto(a, `photo-${i}.jpg`))).then(
+      void Promise.all(drafts.map((draft) => draft.prepared)).then(
         (resized) => {
           setPhotos((prev) =>
             prev.map((p) => {
@@ -331,7 +333,9 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
             }),
           );
         },
-      );
+      ).catch((error) => {
+        setSubmitError(error instanceof Error ? error.message : 'Could not prepare photos.');
+      });
     },
     [dateEdited, observedAtEdited],
   );
@@ -466,78 +470,28 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
     }
   }
 
-  function buildPayload(): CreateMomentPayload {
-    const payload: CreateMomentPayload = {
-      kind,
-      date,
-      visibility_mode: visibility,
-      title: title.trim() || undefined,
-      bible_verse: bibleVerse.trim(),
-      reflection: reflection.trim() || undefined,
-      location_name: locationName.trim() || undefined,
+  function formValues() {
+    return {
+      isEdit, momentType, kind, date, observedAt, title, bibleVerse,
+      reflection, locationName, visibility, selectedPeople, customRows,
     };
-    if (!isEdit) {
-      payload.moment_type = momentType;
-    }
-    if (observedAt.trim()) {
-      const d = new Date(observedAt);
-      if (!Number.isNaN(d.getTime())) payload.observed_at = d.toISOString();
-    } else {
-      payload.observed_at = null;
-    }
-
-    if (visibility === VIS.tagged) {
-      payload.people = [...selectedPeople].map((person_id) => ({
-        person_id,
-        role: 'present',
-      }));
-    } else {
-      payload.people = [];
-    }
-    if (visibility === VIS.custom) {
-      payload.access = customRows
-        .filter((r) => r.userId > 0)
-        .map((r) => ({
-          user_id: r.userId,
-          access_level: r.accessLevel,
-        }));
-    }
-    return payload;
   }
 
   async function onSubmit() {
     setSubmitError(null);
 
-    if (
-      !isEdit &&
-      momentType === 'past' &&
-      photos.length === 0 &&
-      existingPhotos.length === 0
-    ) {
-      setSubmitError(
-        'Add at least one photo for a past moment, or go back and choose “Something to look forward to”.',
-      );
+    const validationError = validateMomentForm(formValues(), photos.length + existingPhotos.length);
+    if (validationError) {
+      setSubmitError(validationError);
       return;
-    }
-
-    if (visibility === VIS.tagged && selectedPeople.size === 0) {
-      setSubmitError(
-        'Choose at least one person to tag, or switch to Friends or Private visibility.',
-      );
-      return;
-    }
-    if (visibility === VIS.custom) {
-      const valid = customRows.filter((r) => r.userId > 0);
-      if (valid.length === 0) {
-        setSubmitError('Add at least one person and access level for custom sharing.');
-        return;
-      }
     }
 
     setSubmitting(true);
     setUploadPhase(null);
     try {
-      const payload = buildPayload();
+      setUploadPhase('Preparing photos…');
+      const preparedPhotos = await Promise.all(photos.map((photo) => photo.prepared));
+      const payload = buildMomentPayload(formValues());
 
       if (isEdit && editId != null) {
         await updateMoment(editId, payload);
@@ -547,11 +501,7 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
         for (let i = 0; i < photos.length; i++) {
           const ph = photos[i]!;
           setUploadPhase(`Uploading photo ${i + 1} of ${photos.length}…`);
-          const file: PhotoUpload = {
-            uri: ph.uri,
-            name: ph.name,
-            type: ph.type,
-          };
+          const file = preparedPhotos[i]!;
           await uploadMomentPhoto(editId, file, ph.caption.trim(), existingPhotos.length + i);
         }
         router.replace(`/moment/${editId}`);
@@ -560,11 +510,7 @@ export function CreateMomentScreen({ editId: routeEditId }: Props) {
         for (let i = 0; i < photos.length; i++) {
           const ph = photos[i]!;
           setUploadPhase(`Uploading photo ${i + 1} of ${photos.length}…`);
-          const file: PhotoUpload = {
-            uri: ph.uri,
-            name: ph.name,
-            type: ph.type,
-          };
+          const file = preparedPhotos[i]!;
           await uploadMomentPhoto(created.id, file, ph.caption.trim(), i);
         }
         router.replace(`/moment/${created.id}`);

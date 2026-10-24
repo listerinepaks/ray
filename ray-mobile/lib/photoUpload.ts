@@ -1,9 +1,8 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import { AVATAR_MAX_PX, MOMENT_MAX_PX, PHOTO_JPEG_QUALITY } from '../../ray-shared/photoRules';
 
 const HEIC_MIME_TYPES = new Set(['image/heic', 'image/heif']);
-const AVATAR_MAX_PX = 600;
-const MOMENT_MAX_PX = 1600;
 const EXTENSION_BY_MIME: Record<string, string> = {
   'image/jpeg': '.jpg',
   'image/png': '.png',
@@ -84,7 +83,7 @@ export async function resizeForAvatar(
     }
   }
   const image = await ctx.renderAsync();
-  const result = await image.saveAsync({ compress: 0.85, format: SaveFormat.JPEG });
+  const result = await image.saveAsync({ compress: PHOTO_JPEG_QUALITY, format: SaveFormat.JPEG });
 
   return { uri: result.uri, name: 'profile-photo.jpg', type: 'image/jpeg' };
 }
@@ -105,7 +104,7 @@ export async function resizeForMomentPhoto(
     }
   }
   const image = await ctx.renderAsync();
-  const result = await image.saveAsync({ compress: 0.85, format: SaveFormat.JPEG });
+  const result = await image.saveAsync({ compress: PHOTO_JPEG_QUALITY, format: SaveFormat.JPEG });
 
   const name = fallbackName.replace(/\.[a-z0-9]+$/i, '.jpg');
   return { uri: result.uri, name, type: 'image/jpeg' };

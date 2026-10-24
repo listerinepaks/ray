@@ -1,3 +1,5 @@
+import { AVATAR_MAX_PX } from '../../../ray-shared/photoRules';
+import { preparePhoto } from '../photoUpload';
 import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -83,7 +85,7 @@ export function Profile() {
       const next = await updateProfile({
         display_name: displayName.trim(),
         bio: bio.trim(),
-        avatar: avatarFile ?? undefined,
+        avatar: avatarFile ? await preparePhoto(avatarFile, AVATAR_MAX_PX) : undefined,
       })
       setProfile(next)
       setDisplayName(next.display_name)
