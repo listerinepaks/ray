@@ -1867,3 +1867,14 @@ a.moment-card-poster {
     margin: 0;
   }
 }
+
+.moment-card-link { display: block; color: inherit; text-decoration: none; min-width: 0; }
+.moment-card .moment-card-activity { margin-top: 0; padding: 0 1.15rem .8rem; }
+.moment-card-activity > .moment-card-activity-item { min-height: 44px; padding: 0 8px; color: inherit; text-decoration: none; }
+.moment-heart-button { min-height: 44px; min-width: 56px; padding: 0 12px; border: 0; border-radius: 22px; background: rgba(201,75,106,.08); color: #c94b6a; display: inline-flex; gap: 6px; align-items: center; justify-content: center; cursor: pointer; font: inherit; }
+.moment-heart-button > span:first-child { font-size: 22px; }
+.moment-heart-button:disabled { cursor: default; }
+.moment-heart-button:disabled:not([title="Heart added"]) { opacity: .5; }
+.moment-heart-button:enabled:hover { background: rgba(201,75,106,.16); }
+.moment-heart-button:focus-visible { outline: 2px solid #c94b6a; outline-offset: 3px; }
+.moment-heart-error { color: #b42318; font-size: .8rem; max-width: 220px; margin: 4px 0 0; }

@@ -1,4 +1,5 @@
 import type { Me, Profile, Moment, MomentComment, MomentReaction, Person, CreateMomentPayload } from '../../ray-shared/types';
+import { ensureMomentHeart } from '../../ray-shared/momentHeart';
 export type { Me, Profile, MomentPhoto, TaggedPerson, Moment, MomentComment, MomentReaction, Person, CreateMomentPayload } from '../../ray-shared/types';
 
 /**
@@ -568,4 +569,11 @@ export async function uploadMomentPhoto(
     body,
   })
   if (!res.ok) throw new Error(await parseErrorBody(res))
+}
+
+export async function addMomentHeart(momentId: number, userId: number): Promise<number> {
+  return ensureMomentHeart(userId,
+    () => fetchMomentReactions(momentId),
+    () => createMomentReaction(momentId, 'heart'),
+  )
 }

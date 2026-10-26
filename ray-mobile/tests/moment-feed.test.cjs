@@ -153,6 +153,7 @@ test('five-minute focus freshness, immediate local changes, refresh override, an
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
     '@/components/AspectFitImage': { AspectFitImage: 'aspect-image' },
     '@/components/MomentPhotoCarousel': { MomentPhotoCarousel: 'carousel' },
+    '@/components/MomentHeartButton': { MomentHeartButton: 'moment-heart-button' },
     '@/components/RayLogo': { RayLogo: 'logo' },
     '@/contexts/AuthContext': { useAuth: () => ({ user }) },
     '@/constants/theme': { theme: {}, fonts: {} },
@@ -356,3 +357,41 @@ test('unexpected push registration rejection cannot interrupt the authenticated 
     console.warn = realWarn;
   }
 });
+
+for (const platform of ['native', 'web']) {
+  test(platform + ' list heart ignores rapid taps, confirms count, and allows retry after failure', async () => {
+    let calls = 0, resolve, reject;
+    const api = { addMomentHeart: () => { calls++; return new Promise((yes, no) => { resolve = yes; reject = no; }); } };
+    const counts = [];
+    const { MomentHeartButton } = loadModule(platform === 'native' ? 'components/MomentHeartButton.tsx' : '../ray-web/src/components/MomentHeartButton.tsx', {
+      '@/lib/api': api, '../api': api,
+      '@/constants/theme': { fonts: {}, theme: {} },
+      '@expo/vector-icons': { Ionicons: 'icon' },
+      'react-native': { View: 'view', Text: 'text', Pressable: 'button', StyleSheet: { create: (styles) => styles } },
+    });
+    let renderer;
+    const props = { moment: moment(1), userId: 1, onCountChange: (id, count) => counts.push([id, count]) };
+    await act(async () => { renderer = create(React.createElement(MomentHeartButton, props)); });
+    const click = () => {
+      const button = renderer.root.findByType('button');
+      (button.props.onPress ?? button.props.onClick)();
+    };
+    await act(async () => { click(); click(); });
+    assert.equal(calls, 1);
+    assert.equal(renderer.root.findByType('button').props.disabled, true);
+    await act(async () => { reject(new Error('offline')); });
+    assert.equal(renderer.root.findByType('button').props.disabled, false);
+    assert.match(JSON.stringify(renderer.toJSON()), /offline/);
+    await act(async () => { click(); });
+    await act(async () => { resolve(3); });
+    assert.equal(calls, 2);
+    assert.equal(renderer.root.findByType('button').props.disabled, true);
+    if (platform === 'web') assert.deepEqual(counts, [[1, 3]]);
+    await act(async () => { renderer.unmount(); });
+    await act(async () => { renderer = create(React.createElement(MomentHeartButton, { ...props, moment: moment(1, { my_access: 'view' }) })); });
+    assert.equal(renderer.root.findByType('button').props.disabled, true);
+    await act(async () => { click(); });
+    assert.equal(calls, 2);
+    await act(async () => { renderer.unmount(); });
+  });
+}

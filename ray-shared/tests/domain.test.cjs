@@ -216,3 +216,27 @@ test('love heart hops stay reachable as it grows, with a distinct next position'
   assert(heartSize(4) > heartSize(3));
   assert.equal(heartSize(5), heartSize(4));
 });
+
+test('list hearts are add-only and respect reaction permissions', async () => {
+  const { ensureMomentHeart, canHeartMoment } = load('../momentHeart.ts');
+  assert.equal(canHeartMoment('view'), false);
+  assert.equal(canHeartMoment(null), false);
+  assert.equal(canHeartMoment('comment'), true);
+  assert.equal(canHeartMoment('edit'), true);
+  const mine = { user: 1, type: 'heart' };
+  let adds = 0;
+  const add = async () => { adds++; return mine; };
+  assert.equal(await ensureMomentHeart(1, async () => [mine], add), 1);
+  assert.equal(adds, 0);
+  assert.equal(await ensureMomentHeart(1, async () => [{ user: 2, type: 'heart' }, { user: 1, type: 'wow' }], add), 3);
+  assert.equal(adds, 1);
+});
+
+test('list hearts recover a duplicate or lost response without double counting', async () => {
+  const { ensureMomentHeart } = load('../momentHeart.ts');
+  let reads = 0;
+  const read = async () => ++reads === 1 ? [] : [{ user: 1, type: 'heart' }];
+  assert.equal(await ensureMomentHeart(1, read, async () => { throw new Error('duplicate'); }), 1);
+  await assert.rejects(ensureMomentHeart(1, async () => [], async () => { throw new Error('offline'); }), /offline/);
+  await assert.rejects(ensureMomentHeart(1, async () => { throw new Error('offline'); }, async () => { assert.fail('must not post without checking'); }), /offline/);
+});

@@ -464,6 +464,8 @@ function App() {
           path="/"
           element={
             <Timeline
+              userId={user.id}
+              onReactionCountChange={(momentId, count) => setMoments((rows) => rows.map((row) => row.id === momentId ? { ...row, reactions_count: count } : row))}
               moments={momentsForTimeline}
               loading={loadingMoments}
               error={error}

@@ -2,6 +2,7 @@ import type { Me, Profile, MomentPhoto, Moment, MomentComment, MomentReaction, P
 export type { Me, Profile, MomentPhoto, TaggedPerson, Moment, MomentComment, MomentReaction, Person, CreateMomentPayload } from '../../ray-shared/types';
 
 import { publishMomentFeedChange } from './momentFeed';
+import { ensureMomentHeart } from '../../ray-shared/momentHeart';
 
 /**
  * Django API client. Native uses `Authorization: Token …` (see `/api/auth/token/`).
@@ -274,6 +275,19 @@ export async function createMomentReaction(momentId: number, type: string): Prom
   });
   if (!res.ok) throw new Error(await parseErrorBody(res));
   return res.json() as Promise<MomentReaction>;
+}
+
+export async function addMomentHeart(momentId: number, userId: number): Promise<number> {
+  const session = authSession;
+  const checkSession = () => {
+    if (session !== authSession) throw new Error('Your session changed. Please try again.');
+  };
+  const count = await ensureMomentHeart(userId,
+    () => { checkSession(); return fetchMomentReactions(momentId); },
+    () => { checkSession(); return createMomentReaction(momentId, 'heart'); },
+  );
+  if (session === authSession) publishMomentFeedChange({ type: 'reactions', momentId, count });
+  return count;
 }
 
 export async function deleteMomentReaction(momentId: number, reactionId: number): Promise<void> {

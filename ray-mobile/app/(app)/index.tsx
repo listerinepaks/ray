@@ -27,6 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AspectFitImage } from '@/components/AspectFitImage';
 import { MomentPhotoCarousel } from '@/components/MomentPhotoCarousel';
+import { MomentHeartButton } from '@/components/MomentHeartButton';
 import { RayLogo } from '@/components/RayLogo';
 import { useAuth } from '@/contexts/AuthContext';
 import { fonts, theme } from '@/constants/theme';
@@ -539,7 +540,6 @@ export default function TimelineScreen() {
             ? [...photos].sort((a, b) => a.sort_order - b.sort_order || a.id - b.id)[0]
             : null;
           const commentCount = m.comments_count ?? 0;
-          const reactionCount = m.reactions_count ?? 0;
           const posterName = m.author_username ?? `user_${m.author}`;
           const posterAvatarUri = m.author_avatar ? mediaUrl(m.author_avatar) : '';
           return (
@@ -647,19 +647,17 @@ export default function TimelineScreen() {
                       {truncateWords(m.reflection, LIST_REFLECTION_MAX_WORDS)}
                     </Text>
                   ) : null}
-                  <View style={styles.cardSocial} accessibilityLabel={`${commentCount} comments, ${reactionCount} reactions`}>
-                    <Ionicons name="chatbubble-outline" size={15} color={theme.textMuted} />
-                    <Text style={styles.cardSocialText}>{commentCount}</Text>
-                    <Ionicons
-                      name="heart-outline"
-                      size={15}
-                      color={theme.textMuted}
-                      style={styles.cardSocialIconSecond}
-                    />
-                    <Text style={styles.cardSocialText}>{reactionCount}</Text>
-                  </View>
                 </View>
               </Pressable>
+              <View style={styles.cardSocial}>
+                <Pressable onPress={() => router.push(`/moment/${m.id}`)}
+                  accessibilityRole="button" accessibilityLabel={`${commentCount} comments`}
+                  style={styles.commentButton}>
+                  <Ionicons name="chatbubble-outline" size={15} color={theme.textMuted} />
+                  <Text style={styles.cardSocialText}>{commentCount}</Text>
+                </Pressable>
+                <MomentHeartButton key={`${user?.id}:${m.id}`} moment={m} userId={user?.id} />
+              </View>
             </View>
           );
         })}
@@ -1144,12 +1142,13 @@ const styles = StyleSheet.create({
     color: theme.textPrimary,
   },
   cardSocial: {
-    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
   },
-  cardSocialIconSecond: { marginLeft: 6 },
+  commentButton: { minHeight: 44, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 5 },
   cardSocialText: {
     fontFamily: fonts.sansSemiBold,
     fontSize: 13,

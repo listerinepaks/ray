@@ -5,6 +5,7 @@ export const FEED_STALE_MS = 5 * 60_000;
 export type MomentFeedChange =
   | { type: 'upsert'; moment: Moment }
   | { type: 'remove'; momentId: number }
+  | { type: 'reactions'; momentId: number; count: number }
   | { type: 'photo-upsert'; momentId: number; photo: MomentPhoto }
   | { type: 'photo-remove'; momentId: number; photoId: number };
 
@@ -36,6 +37,7 @@ export function applyMomentFeedChange(moments: Moment[], change: MomentFeedChang
   if (change.type === 'remove') return moments.filter((moment) => moment.id !== change.momentId);
   return moments.map((moment) => {
     if (moment.id !== change.momentId) return moment;
+    if (change.type === 'reactions') return { ...moment, reactions_count: change.count };
     const photos = change.type === 'photo-remove'
       ? moment.photos.filter((photo) => photo.id !== change.photoId)
       : [...moment.photos.filter((photo) => photo.id !== change.photo.id), change.photo]
